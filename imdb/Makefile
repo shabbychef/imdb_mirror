@@ -89,8 +89,7 @@ help :
 	@-echo "make sqlite             make the (pruned,final) sqlite file"
 	@-echo "make sqlitecon          connect to the pruned sqlite file"
 	@-echo "make mysql_init         initialize db"
-	@-echo "make put                stash sqlite file into mysql db, touching sentinel"
-	@-echo "make R                  call R locally"
+	@-echo "make stuffed            stash sqlite file into mysql db, touching sentinel"
 
 env :
 	env
@@ -147,7 +146,7 @@ $(UNINIT_SENTINEL) :
 
 # UNFOLD
 
-### download# FOLDUP
+# download# FOLDUP
 
 # rigamarole so that make -j 5 works.
 $(RAW_DIR)/%.gz :
@@ -168,7 +167,7 @@ $(DOWNL_SENTINEL) : $(RAW_NEEDED)
 downloaded : $(DOWNL_SENTINEL) 
 # UNFOLD
 
-### prune out TV shows and such# FOLDUP
+# prune out TV shows and such# FOLDUP
 % : %.gz 
 	gunzip %<
 
@@ -258,7 +257,7 @@ procd : $(PROC_NEEDED)
 
 # UNFOLD
 
-### raw files to sqlite via imdbpy2sql# FOLDUP
+# raw files to sqlite via imdbpy2sql# FOLDUP
 # first move the file out of the way o/w sqlite is very slow.
 # c.f. http://stackoverflow.com/a/3143729/164611
 $(IMDB_RAW_SQLITE) : $(PROC_NEEDED)
@@ -268,7 +267,7 @@ $(IMDB_RAW_SQLITE) : $(PROC_NEEDED)
 
 # UNFOLD
 
-### prune porn from the sqlite# FOLDUP
+# prune porn from the sqlite# FOLDUP
 $(IMDB_PRUNE_SQLITE) : $(IMDB_RAW_SQLITE)
 	cp $< $@
 	< prune.sql sqlite3 $@
@@ -287,7 +286,7 @@ sqlite : $(IMDB_PRUNE_SQLITE)
 #/opt/imdbpy/imdbpy2sql.py --mysql-force-myisam -u mysql://moe:movies4me@0.0.0.0:23306/movies -d $(<D)
 #< prune.sql mysql -h 0.0.0.0 -P 23306 --password=movies4me -u moe movies
 
-### put into mysql# FOLDUP
+# put into mysql# FOLDUP
 stuffed : $(PUT_SENTINEL) 
 
 $(PUT_SENTINEL) : $(IMDB_PRUNE_SQLITE) $(INIT_SENTINEL)
@@ -297,7 +296,7 @@ $(PUT_SENTINEL) : $(IMDB_PRUNE_SQLITE) $(INIT_SENTINEL)
 
 # UNFOLD
 
-### remove from mysql# FOLDUP
+# remove from mysql# FOLDUP
 # does this work? http://stackoverflow.com/q/25394493/164611
 $(UNPUT_SENTINEL) : 
 	$(call dbcall,TRUNCATE TABLE name;)
@@ -344,10 +343,6 @@ $(TTLINK_UNPUT_SENTINEL) :
 
 sqlitecon : $(IMDB_PRUNE_SQLITE)
 	sqlite3 $<
-
-R :
-	echo "this is dumb, you know that?"
-	R
 
 #for vim modeline: (do not edit)
 # vim:ts=2:sw=2:tw=129:fdm=marker:fmr=FOLDUP,UNFOLD:cms=#%s:tags=.tags;:syn=make:ft=make:ai:si:cin:nu:fo=croqt:cino=p0t0c5(0:
