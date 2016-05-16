@@ -1,0 +1,10 @@
+# common entries
+common:
+  dns:
+  - 8.8.8.8
+  - 8.8.4.4
+  volumes:
+  - /etc/localtime:/etc/localtime:ro 
+
+#for vim modeline: (do not edit)
+# vim:ts=2:sw=2:tw=79:fdm=marker:fmr=FOLDUP,UNFOLD:cms=#%s:tags=.tags;:syn=yaml:ft=yaml:et:ai:si:cin:nu:fo=croqt:cino=p0t0c5(0:ff=unix

@@ -1,0 +1,42 @@
+# mirror of imdb via scrape.
+# requires SRV to be set
+
+mariastate:
+  image: ubuntu
+  entrypoint: /bin/true
+  volumes:
+  - ./srv/imdb/mariadb:/var/lib/mysql:rw
+state:
+  image: ubuntu
+  entrypoint: /bin/true
+  volumes:
+  - ./srv/imdb/state:/srv:rw
+imdb:
+  extends:
+    file: common.yml
+    service: common
+  build: ./imdb
+  command: noop
+  restart: "no"
+  links: 
+  - mysqldb:mysqldb
+  volumes_from:
+  - state
+mysqldb:
+  extends:
+    file: common.yml
+    service: common
+  image: mariadb:10.1
+  volumes_from:
+  - mariastate 
+  restart: "always"
+  ports:
+  - 0.0.0.0:23306:3306
+  environment:
+  - MYSQL_ROOT_PASSWORD=youdonotneedthis
+  volumes:
+  - ./mysql_confd:/etc/mysql/conf.d:ro
+  - ./mysql_init:/docker-entrypoint-initdb.d:ro 
+
+#for vim modeline: (do not edit)
+# vim:ts=2:sw=2:tw=79:fdm=marker:fmr=FOLDUP,UNFOLD:cms=#%s:tags=.tags;:syn=yaml:ft=yaml:et:ai:si:cin:nu:fo=croqt:cino=p0t0c5(0:ff=unix

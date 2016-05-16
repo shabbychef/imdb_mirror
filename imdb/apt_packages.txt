@@ -1,0 +1,11 @@
+make 
+wget 
+rsync 
+perl 
+libmysqlclient-dev 
+mysql-client
+libsqlite3-0
+python-imdbpy 
+python-sqlobject 
+python-sqlalchemy 
+sqlite3 
