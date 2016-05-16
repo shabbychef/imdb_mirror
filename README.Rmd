@@ -121,7 +121,7 @@ Here we use `dplyr` to connect to the database, and create a list of
 the best 'underrated' movies of each year. The criteria are:
 
 1. More than 500 ratings, but
-1. fewer than 1500 ratings, and 
+1. fewer than 2000 ratings, and 
 1. ranked via mean rating divided by standard deviation.
 
 
@@ -133,15 +133,14 @@ imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',
 dbGetQuery(imcon$con,'SET NAMES utf8')
 
 tbl(imcon,'movie_votes') %>%
-	filter(votes >= 500,votes <= 1500) %>% 
+	filter(votes >= 500,votes <= 2000) %>% 
   mutate(vote_sr=vote_mean/vote_sd) %>%
   select(movie_id,vote_sr) %>%
 	left_join(tbl(imcon,'title') %>% select(movie_id,title,production_year),by='movie_id') %>%
   arrange(desc(vote_sr)) %>%
   collect() %>% 
 	group_by(production_year) %>%
-  summarize(bestid=first(movie_id),
-    title=first(title),
+  summarize(title=first(title),
     sr=max(vote_sr)) %>%
   ungroup() %>%
 	arrange(production_year) %>%
