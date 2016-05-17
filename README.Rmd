@@ -109,6 +109,13 @@ imake sqlite
 imake stuffed
 ```
 
+**Note** This can take a good long while. Depending on your internet connection, the 
+download might take 20 minutes or more. Processing into sqlite may take around 10 to 
+15 minutes, and then post-processing and loading into mariadb may take an hour. Also,
+intermediate files will be kept around, saved in the `./srv/imdb/state` directory.
+Having intermediate files allows you to change the code and rerun without forcing a
+new download.
+
 Now connect to the database and poke around:
 
 ```{r mysqlcon,engine='bash',comment='bash',cache=TRUE,eval=FALSE}
@@ -125,7 +132,7 @@ the best 'underrated' movies of each year. The criteria are:
 1. ranked via mean rating divided by standard deviation.
 
 
-```{r sortem,cache=TRUE,eval=TRUE}
+```{r sortem,cache=TRUE,eval=TRUE,tidy=FALSE}
 library(RMySQL)
 library(dplyr)
 library(knitr)
@@ -133,17 +140,20 @@ imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',
 dbGetQuery(imcon$con,'SET NAMES utf8')
 
 tbl(imcon,'movie_votes') %>%
-	filter(votes >= 500,votes <= 2000) %>% 
+  filter(votes >= 500,votes <= 2000) %>% 
+  inner_join(tbl(imcon,'movie_runtime') %>% 
+    filter(runtime > 60) %>% 
+    select(movie_id),by='movie_id') %>%
   mutate(vote_sr=vote_mean/vote_sd) %>%
   select(movie_id,vote_sr) %>%
-	left_join(tbl(imcon,'title') %>% select(movie_id,title,production_year),by='movie_id') %>%
+  left_join(tbl(imcon,'title') %>% select(movie_id,title,production_year),by='movie_id') %>%
   arrange(desc(vote_sr)) %>%
   collect() %>% 
-	group_by(production_year) %>%
+  group_by(production_year) %>%
   summarize(title=first(title),
     sr=max(vote_sr)) %>%
   ungroup() %>%
-	arrange(production_year) %>%
+  arrange(production_year) %>%
   kable()
 ```
 
