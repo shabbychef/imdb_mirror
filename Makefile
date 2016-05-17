@@ -23,7 +23,7 @@ help:  ## generate this help message
 	@grep -P '^(([^\s]+\s+)*([^\s]+))\s*:.*?##\s*.*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 
-README.md : README.Rmd 
+%.md : %.Rmd
 	r -l knitr -e 'setwd("$(<D)");if (require(knitr)) { knit("$(<F)") }'
 
 #for vim modeline: (do not edit)
