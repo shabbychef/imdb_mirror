@@ -22,7 +22,7 @@ Here we will check the data, to see if we can find any
 oddities or insights. First, we attach ourselves to our movie database,
 and poke around:
 
-```{r docon}
+```{r docon,cache=FALSE}
 library(DBI)
 library(RMySQL)
 library(dplyr)
@@ -441,7 +441,7 @@ October, and `Drama`s pick up later in the year. A case might also be had for `R
 
 ```{r seas_bygenre,cache=TRUE}
 
-mgenres <- tbl(dbcon,sql("SELECT movie_id,info FROM movie_info WHERE info_type_id IN (SELECT id FROM info_type WHERE info='genres')")) %>%
+mgenres <- tbl(dbcon,sql("SELECT movie_id,info FROM movie_info WHERE info_type_id IN (SELECT info_type_id FROM info_type WHERE info='genres')")) %>%
 	rename(genre=info)
 
 totgenres <- mgenres %>%

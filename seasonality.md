@@ -533,7 +533,7 @@ October, and `Drama`s pick up later in the year. A case might also be had for `R
 
 
 ```r
-mgenres <- tbl(dbcon,sql("SELECT movie_id,info FROM movie_info WHERE info_type_id IN (SELECT id FROM info_type WHERE info='genres')")) %>%
+mgenres <- tbl(dbcon,sql("SELECT movie_id,info FROM movie_info WHERE info_type_id IN (SELECT info_type_id FROM info_type WHERE info='genres')")) %>%
 	rename(genre=info)
 
 totgenres <- mgenres %>%
@@ -584,21 +584,8 @@ gopen <- gopen %>%
 gopen$month <- factor(base::months(gopen$month_end,abbreviate=FALSE),levels=month.name)
 
 mod0 <- lm(log(aps_tenk) ~ month_end,data=gopen)
-```
-
-```
-## Error in lm.fit(x, y, offset = offset, singular.ok = singular.ok, ...): 0 (non-NA) cases
-```
-
-```r
 gopen$residuals <- exp(mod0$residuals)
-```
 
-```
-## Error in `$<-.data.frame`(`*tmp*`, "residuals", value = structure(c(1.28852783637063, : replacement has 2476 rows, data has 0
-```
-
-```r
 ph <- ggplot(gopen,aes(x=month,y=residuals)) +
 	geom_boxplot() + 
 	facet_grid(genre ~ .) + 
@@ -606,9 +593,7 @@ ph <- ggplot(gopen,aes(x=month,y=residuals)) +
 print(ph)
 ```
 
-```
-## Error: Faceting variables must have at least one value
-```
+![plot of chunk seas_bygenre](figure/seasonality_seas_bygenre-1.png)
 
 ```r
 moammt <- left_join(gopen,gopen %>% 
@@ -624,7 +609,11 @@ ph <- ggplot(moammt,aes(x=month,weight=100*prop_amount/19,fill=genre)) +
 print(ph)
 ```
 
-![plot of chunk seas_bygenre](figure/seasonality_seas_bygenre-1.png)
+```
+## Error: StatBin requires a continuous x variable the x variable is discrete. Perhaps you want stat="count"?
+```
+
+![plot of chunk seas_bygenre](figure/seasonality_seas_bygenre-2.png)
 
 
 
