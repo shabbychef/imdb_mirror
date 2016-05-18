@@ -1,18 +1,13 @@
 
 
-# Checking IMDb data
 
+# Seasonality of theatrical release via IMDb data
 
+## The data
 
 The IMDb [ftp data](ftp://ftp.fu-berlin.de/pub/misc/movies/database/)
-includes information about budget, box office, rentals, and admissions. The
-data are somewhat spotty, so we should compare them to _e.g._ 
-[the movie db](http://www.themoviedb.org) for correctness and completeness.
-I would not be surprised, however, if one of these is the source for the other!
-We may be able to get more rich box office data from OpusData or some other
-source. 
-
-Here, however, we will check the data directly, to see if we can find any
+includes information about budget, box office, rentals, and admissions. 
+Here we will check the data, to see if we can find any
 oddities or insights. First, we attach ourselves to our movie database,
 and poke around:
 
@@ -24,6 +19,14 @@ library(dplyr)
 
 dbcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',
 	port=23306)
+dbGetQuery(dbcon$con,'SET NAMES utf8')
+```
+
+```
+## NULL
+```
+
+```r
 src_tbls(dbcon) 
 ```
 
@@ -264,7 +267,7 @@ print(ph)
 	#layer_boxplots()
 ```
 
-# Does this hold for small films?
+## Does this hold for small films?
 
 We see the classic 'summer blockbuster' effect starting in early May and running through July, with
 another pickup in November. This effect is real and has to be corrected for if we are going to look at
@@ -316,7 +319,7 @@ print(ph)
 
 ![plot of chunk smallfilm](figure/seasonality_smallfilm-1.png)
 
-# All gross receipts
+## All gross receipts
 
 The IMDb data also holds weekend gross figures for films beyond their opening weekend.
 Here I grab weekend gross numbers for films which opened on more than 100 screens. I
@@ -380,7 +383,7 @@ print(ph)
 
 ![plot of chunk allgross](figure/seasonality_allgross-2.png)
 
-# Screens for budget
+## Screens for budget
 
 The IMDb data also holds budget data. Here we look at the number of screens reported for opening weekend
 versus the reported budget, in millions, for films with US opens and budgets given in dollars. 
@@ -439,7 +442,7 @@ print(mod0$coefficients)
 ##               7.0751               0.2055
 ```
 
-# By genre?
+## By genre?
 
 We have genre information in the IMDb data. Genres are not exclusive: a movie has multiple genres listed. To deal with
 this problem, I compute the number of genres listed for a movie, then create a weighting for that movie which is
@@ -454,7 +457,7 @@ then plotted for the most popular genres. There is not a huge difference between
 
 
 ```r
-mgenres <- tbl(dbcon,sql("SELECT movie_id,info FROM movie_info WHERE info_type_id IN (SELECT id FROM info_type WHERE info='genres')")) %>%
+mgenres <- tbl(dbcon,sql("SELECT movie_id,info FROM movie_info WHERE info_type_id IN (SELECT info_type_id FROM info_type WHERE info='genres')")) %>%
 	rename(genre=info)
 
 totgenres <- mgenres %>%
