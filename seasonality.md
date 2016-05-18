@@ -596,21 +596,21 @@ print(ph)
 ![plot of chunk seas_bygenre](figure/seasonality_seas_bygenre-1.png)
 
 ```r
-moammt <- left_join(gopen,gopen %>% 
+moammt <- gopen %>%
 	group_by(month_end) %>%
-	summarize(totwamount=sum(wamount_tenmillions,na.rm=TRUE)),
-	by='month_end') %>%
-	mutate(prop_amount=wamount_tenmillions / totwamount)
+	mutate(prop_amount=wamount_tenmillions / sum(wamount_tenmillions,na.rm=TRUE)) %>%
+  ungroup() %>%
+  group_by(month,genre) %>%
+	summarize(prop_prop=mean(prop_amount)) %>%
+  ungroup() %>% 
+  group_by(month) %>%
+  mutate(tot_prop=prop_prop / sum(prop_prop)) %>%
+  ungroup() 
 
-
-ph <- ggplot(moammt,aes(x=month,weight=100*prop_amount/19,fill=genre)) +
-	geom_bar(binwidth=29) + 
+ph <- ggplot(moammt,aes(x=month,weight=100*tot_prop,fill=genre)) +
+	geom_bar() + 
 	labs(y='% gross receipts')
 print(ph)
-```
-
-```
-## Error: StatBin requires a continuous x variable the x variable is discrete. Perhaps you want stat="count"?
 ```
 
 ![plot of chunk seas_bygenre](figure/seasonality_seas_bygenre-2.png)
