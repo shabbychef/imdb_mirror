@@ -99,6 +99,89 @@ Now connect to the database and poke around:
 mysql -s --host=0.0.0.0 --port=23306 --user=moe --password=movies4me IMDB
 ```
 
+## What is in the database?
+
+First, let us check the available tables:
+
+
+```r
+library(RMySQL)
+library(dplyr)
+library(knitr)
+imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
+dbGetQuery(imcon$con,'SET NAMES utf8')
+```
+
+```
+## NULL
+```
+
+```r
+show(src_tbls(imcon))
+```
+
+```
+##  [1] "aka_name"                  "aka_title"                 "cast_info"                
+##  [4] "char_name"                 "company_name"              "company_type"             
+##  [7] "info_type"                 "keyword"                   "movie_US_gross"           
+## [10] "movie_admissions"          "movie_budgets"             "movie_companies"          
+## [13] "movie_first_US_release"    "movie_gross"               "movie_info"               
+## [16] "movie_info_idx"            "movie_keyword"             "movie_opening_weekend"    
+## [19] "movie_premiere_US_release" "movie_raw_runtimes"        "movie_release_dates"      
+## [22] "movie_rentals"             "movie_runtime"             "movie_votes"              
+## [25] "movie_weekend_gross"       "name"                      "name_link"                
+## [28] "person_info"               "role_type"                 "title"                    
+## [31] "title_link"                "votes_per_year"
+```
+
+### Movie info
+
+First, how many movies do we have:
+
+
+```r
+nmovies <- tbl(imcon,'title') %>%
+	summarize(count=n()) 
+print(nmovies)
+```
+
+```
+## Source: mysql 5.5.5-10.1.13-MariaDB-1~jessie [moe@0.0.0.0:/IMDB]
+## From: <derived table> [?? x 1]
+## 
+##     count
+##     (dbl)
+## 1  233061
+## ..    ...
+```
+
+Now some infor abouta some of the tables:
+
+
+
+```r
+print(tbl(imcon,'movie_US_gross'))
+```
+
+```
+## Source: mysql 5.5.5-10.1.13-MariaDB-1~jessie [moe@0.0.0.0:/IMDB]
+## From: movie_US_gross [13,689 x 3]
+## 
+##    movie_id gross_dollars last_report_date
+##       (dbl)         (dbl)            (chr)
+## 1       313       5.2e+04       2010-01-17
+## 2       323       9.3e+03       2016-05-18
+## 3       362       1.3e+06       2015-05-03
+## 4       412       7.1e+06       2016-05-18
+## 5       447       1.1e+08       2016-05-18
+## 6       498       2.2e+06       1943-12-31
+## 7       623       4.4e+05       2016-05-18
+## 8       627       2.2e+06       1940-12-31
+## 9       665       8.5e+02       2016-05-18
+## 10      678       3.3e+06       2016-05-18
+## ..      ...           ...              ...
+```
+
 ## Example usage
 
 Here we use `dplyr` to connect to the database, and create a list of

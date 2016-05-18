@@ -122,6 +122,37 @@ Now connect to the database and poke around:
 mysql -s --host=0.0.0.0 --port=23306 --user=moe --password=movies4me IMDB
 ```
 
+## What is in the database?
+
+First, let us check the available tables:
+
+```{r avail_tables,cache=TRUE,eval=TRUE,tidy=FALSE}
+library(RMySQL)
+library(dplyr)
+library(knitr)
+imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
+dbGetQuery(imcon$con,'SET NAMES utf8')
+show(src_tbls(imcon))
+```
+
+### Movie info
+
+First, how many movies do we have:
+
+```{r avail_movies,cache=TRUE,eval=TRUE,tidy=FALSE}
+nmovies <- tbl(imcon,'title') %>%
+	summarize(count=n()) 
+print(nmovies)
+```
+
+Now some infor abouta some of the tables:
+
+
+```{r movie_tables,cache=TRUE,eval=TRUE,tidy=FALSE}
+print(tbl(imcon,'movie_US_gross'))
+
+```
+
 ## Example usage
 
 Here we use `dplyr` to connect to the database, and create a list of
