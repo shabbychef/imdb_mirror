@@ -50,5 +50,8 @@ olviewit : README.md ## view the README.md locally
 
 viewit : README.view ## view the README.html locally w/out internet connection
 
+localcon : ## open a mysql connection to the database 
+	mysql -s --host=0.0.0.0 --port=23306 --user=moe --password=movies4me IMDB
+
 #for vim modeline: (do not edit)
 # vim:ts=2:sw=2:tw=129:fdm=marker:fmr=FOLDUP,UNFOLD:cms=#%s:tags=.tags;:syn=make:ft=make:ai:si:cin:nu:fo=croqt:cino=p0t0c5(0:

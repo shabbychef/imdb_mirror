@@ -135,7 +135,7 @@ capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
 show(src_tbls(imcon))
 ```
 
-### Movie info
+## Movie info
 
 First, how many movies do we have:
 
@@ -169,7 +169,84 @@ capt <- lapply(movie_tables,showtable)
 
 ```
 
-## Example usage
+-------------
+
+## Cast by budget
+
+Here we grab all movies with budget information (_n.b._ these are sometimes
+bogus, because IMDb users can enter the information without much confirmation.)
+then sum movie budgets for each actor and actress appearing in the movie,
+then find the top actor and actress by birth year. Here we list the top
+actor and actress by birth year, with total budget in billions, and the number
+of films:
+
+
+```{r starpower_I,cache=TRUE,eval=TRUE,tidy=FALSE,results='asis'}
+library(RMySQL)
+library(dplyr)
+library(knitr)
+imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
+capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
+
+budgets <- tbl(imcon,'movie_budgets') %>%
+	filter(units=='$') %>%
+	select(movie_id,amount)
+
+role_info <- tbl(imcon,'role_type') %>%
+	filter(role %in% c('actor','actress')) %>%
+	select(role_id)
+
+sumbudget <- tbl(imcon,'cast_info') %>%
+	inner_join(role_info,by='role_id') %>%
+  select(movie_id,person_id,role_id) %>%
+	inner_join(budgets,by='movie_id') %>%
+	group_by(person_id) %>% 
+	summarize(totroles=n(),
+    sumamount=sum(amount)) %>%
+  ungroup()
+
+aggregated <- sumbudget %>%
+	inner_join(tbl(imcon,'name') %>%
+		select(person_id,name,dob,gender) %>%
+    filter(!is.null(dob)),by='person_id') %>%
+  collect() 
+
+topcast <- aggregated %>%
+	mutate(yob=as.numeric(gsub('^((19|20)\\d{2}).+','\\1',dob))) %>%
+	filter(!is.na(yob)) %>%
+  group_by(yob,gender) %>%
+  arrange(desc(sumamount)) %>%
+  summarize(totbudget=first(sumamount) / 1e9,
+    topname=first(name),
+    toproles=first(totroles)) %>%
+  ungroup()
+
+
+# I wish there were an easy way to do this via tidyr,
+# and maybe there is...
+topm <- topcast %>% 
+  select(yob,topname,toproles,totbudget,gender) %>% 
+	filter(gender=='m')
+topf <- topcast %>% 
+  select(yob,topname,toproles,totbudget,gender) %>% 
+	filter(gender=='f')
+
+topc <- inner_join(topm %>% select(-gender),topf %>% select(-gender),by='yob') %>%
+	rename(actor_total_budget=totbudget.x,
+    actor_name=topname.x,
+    actor_roles=toproles.x,
+    actress_total_budget=totbudget.y,
+    actress_name=topname.y,
+    actress_roles=toproles.y)
+
+topc %>% 
+	filter(yob > 1945,yob <= 1995) %>%
+  kable()
+```
+
+-------------
+
+## Underrated movies
 
 Here we use `dplyr` to connect to the database, and create a list of
 the best 'underrated' movies of each year. The criteria are:

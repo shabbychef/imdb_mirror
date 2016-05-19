@@ -127,7 +127,7 @@ show(src_tbls(imcon))
 ## [31] "title_link"                "votes_per_year"
 ```
 
-### Movie info
+## Movie info
 
 First, how many movies do we have:
 
@@ -394,7 +394,140 @@ capt <- lapply(movie_tables,showtable)
 |   185421|  5|$     |   4808|USA    |       1|2001-07-22 |         7|Der blaue Engel |
 |   185421|  6|$     |   6451|USA    |       1|2001-07-15 |         0|Der blaue Engel |
 
-## Example usage
+-------------
+
+## Cast by budget
+
+Here we grab all movies with budget information (_n.b._ these are sometimes
+bogus, because IMDb users can enter the information without much confirmation.)
+then sum movie budgets for each actor and actress appearing in the movie,
+then find the top actor and actress by birth year. Here we list the top
+actor and actress by birth year, with total budget in billions, and the number
+of films:
+
+
+
+```r
+library(RMySQL)
+library(dplyr)
+library(knitr)
+imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
+capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
+
+budgets <- tbl(imcon,'movie_budgets') %>%
+	filter(units=='$') %>%
+	select(movie_id,amount)
+
+role_info <- tbl(imcon,'role_type') %>%
+	filter(role %in% c('actor','actress')) %>%
+	select(role_id)
+
+sumbudget <- tbl(imcon,'cast_info') %>%
+	inner_join(role_info,by='role_id') %>%
+  select(movie_id,person_id,role_id) %>%
+	inner_join(budgets,by='movie_id') %>%
+	group_by(person_id) %>% 
+	summarize(totroles=n(),
+    sumamount=sum(amount)) %>%
+  ungroup()
+
+aggregated <- sumbudget %>%
+	inner_join(tbl(imcon,'name') %>%
+		select(person_id,name,dob,gender) %>%
+    filter(!is.null(dob)),by='person_id') %>%
+  collect() 
+
+topcast <- aggregated %>%
+	mutate(yob=as.numeric(gsub('^((19|20)\\d{2}).+','\\1',dob))) %>%
+	filter(!is.na(yob)) %>%
+  group_by(yob,gender) %>%
+  arrange(desc(sumamount)) %>%
+  summarize(totbudget=first(sumamount) / 1e9,
+    topname=first(name),
+    toproles=first(totroles)) %>%
+  ungroup()
+
+
+# I wish there were an easy way to do this via tidyr,
+# and maybe there is...
+topm <- topcast %>% 
+  select(yob,topname,toproles,totbudget,gender) %>% 
+	filter(gender=='m')
+topf <- topcast %>% 
+  select(yob,topname,toproles,totbudget,gender) %>% 
+	filter(gender=='f')
+
+topc <- inner_join(topm %>% select(-gender),topf %>% select(-gender),by='yob') %>%
+	rename(actor_total_budget=totbudget.x,
+    actor_name=topname.x,
+    actor_roles=toproles.x,
+    actress_total_budget=totbudget.y,
+    actress_name=topname.y,
+    actress_roles=toproles.y)
+
+topc %>% 
+	filter(yob > 1945,yob <= 1995) %>%
+  kable()
+```
+
+
+
+|  yob|actor_name            | actor_roles| actor_total_budget|actress_name        | actress_roles| actress_total_budget|
+|----:|:---------------------|-----------:|------------------:|:-------------------|-------------:|--------------------:|
+| 1946|Welker, Frank         |         137|               8.27|Sarandon, Susan     |            52|                 1.63|
+| 1947|Ratzenberger, John    |          35|               2.88|Marshall, Mona      |            29|                 2.84|
+| 1948|Jackson, Samuel L.    |          88|               4.80|Bates, Kathy        |            37|                 1.70|
+| 1949|Broadbent, Jim        |          42|               2.48|Weaver, Sigourney   |            43|                 1.76|
+| 1950|Coltrane, Robbie      |          25|               2.06|Walters, Julie      |            16|                 1.31|
+| 1951|Williams, Robin       |          58|               2.56|MacNeille, Tress    |            35|                 1.82|
+| 1952|Neeson, Liam          |          63|               3.66|Newman, Laraine     |            32|                 2.77|
+| 1953|Molina, Alfred        |          35|               1.90|Lockhart, Anne      |            29|                 1.28|
+| 1954|Rabson, Jan           |          32|               2.47|Russo, Rene         |            20|                 1.16|
+| 1955|Willis, Bruce         |          76|               3.41|Goldberg, Whoopi    |            45|                 1.38|
+| 1956|Hanks, Tom            |          53|               3.59|Staunton, Imelda    |            20|                 1.20|
+| 1957|Castellaneta, Dan     |          38|               2.37|Hoffman, Bridget    |            30|                 1.83|
+| 1958|Oldman, Gary          |          42|               3.20|Pfeiffer, Michelle  |            32|                 1.29|
+| 1959|Morshower, Glenn      |          39|               1.97|Thompson, Emma      |            27|                 1.66|
+| 1960|Weaving, Hugo         |          32|               3.30|Moore, Julianne     |            51|                 1.64|
+| 1961|Murphy, Eddie         |          58|               3.38|Hunt, Bonnie        |            20|                 1.52|
+| 1962|Baker, Dee Bradley    |          58|               3.37|Cusack, Joan        |            28|                 1.31|
+| 1963|Harnell, Jess         |          42|               4.39|Shue, Elisabeth     |            24|                 0.59|
+| 1964|Papajohn, Michael     |          52|               3.88|Janssen, Famke      |            31|                 1.51|
+| 1965|Downey Jr., Robert    |          53|               3.50|Lane, Diane         |            25|                 1.39|
+| 1966|Favreau, Jon          |          30|               2.15|Berry, Halle        |            36|                 2.60|
+| 1967|Ruffalo, Mark         |          38|               2.24|Derryberry, Debi    |            25|                 2.10|
+| 1968|Vernon, Conrad        |          26|               3.75|Liu, Lucy           |            26|                 1.29|
+| 1969|Black, Jack           |          47|               2.58|Blanchett, Cate     |            33|                 2.48|
+| 1970|Damon, Matt           |          57|               2.97|Bahris, Fileena     |            16|                 1.72|
+| 1971|Renner, Jeremy        |          27|               2.59|Gugino, Carla       |            30|                 1.81|
+| 1972|Johnson, Dwayne       |          33|               1.91|Diaz, Cameron       |            35|                 1.90|
+| 1973|Marsden, James        |          37|               2.08|Wiig, Kristen       |            22|                 1.28|
+| 1974|Bale, Christian       |          33|               1.93|Banks, Elizabeth    |            33|                 1.80|
+| 1975|Maguire, Tobey        |          21|               1.81|Jolie, Angelina     |            34|                 2.32|
+| 1976|Cumberbatch, Benedict |          19|               1.79|Harris, Naomie      |            13|                 1.30|
+| 1977|Bloom, Orlando        |          18|               2.01|Washington, Kerry   |            20|                 0.86|
+| 1978|Mackie, Anthony       |          37|               2.64|Saldana, Zoe        |            25|                 1.32|
+| 1979|Jiskoot Jr., Bjorn    |           5|               1.64|Dawson, Rosario     |            33|                 1.25|
+| 1980|Tatum, Channing       |          31|               1.58|Green, Eva          |             9|                 0.96|
+| 1981|Evans, Chris          |          29|               3.20|Portman, Natalie    |            33|                 1.51|
+| 1982|Rogen, Seth           |          34|               1.84|Dunst, Kirsten      |            36|                 1.44|
+| 1983|Hemsworth, Chris      |          18|               2.03|Kunis, Mila         |            21|                 1.11|
+| 1984|Curry, Graham         |          16|               1.71|Johansson, Scarlett |            39|                 3.26|
+| 1985|Lutz, Kellan          |          14|               0.70|Knightley, Keira    |            19|                 1.30|
+| 1986|LaBeouf, Shia         |          20|               1.49|Fox, Megan          |            11|                 0.82|
+| 1987|Felton, Tom           |          14|               1.28|Page, Ellen         |            12|                 0.82|
+| 1988|Integra, Raiden       |          15|               1.56|Stone, Emma         |            16|                 0.94|
+| 1989|Hoult, Nicholas       |          13|               1.31|Olsen, Elizabeth    |             7|                 1.36|
+| 1990|Taylor-Johnson, Aaron |          14|               1.08|Lawrence, Jennifer  |            18|                 1.42|
+| 1991|Keynes, Skandar       |           3|               0.56|Wright, Bonnie      |             7|                 1.03|
+| 1992|Sabara, Daryl         |          19|               1.60|Watters, Bailee     |             8|                 0.81|
+| 1993|Bright, Cameron       |          16|               0.80|Robb, AnnaSophia    |            11|                 0.42|
+| 1994|Melling, William      |           5|               0.70|Fanning, Dakota     |            21|                 0.86|
+| 1995|Jackson, Billy        |           6|               0.58|Hanratty, Sammi     |            14|                 0.87|
+
+-------------
+
+## Underrated movies
 
 Here we use `dplyr` to connect to the database, and create a list of
 the best 'underrated' movies of each year. The criteria are:
