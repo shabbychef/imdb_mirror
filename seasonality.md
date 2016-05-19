@@ -52,7 +52,7 @@ src_tbls(dbcon)
 follows.)
 
 First, let us check for movies. Note that we tried to remove porn, TV
-shows, video games, and so on. We are left with around 700K titles (many
+shows, video games, and so on. We are left with around 250K titles (many
 of these are probably shorts):
 
 ```r

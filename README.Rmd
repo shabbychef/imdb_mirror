@@ -131,7 +131,7 @@ library(RMySQL)
 library(dplyr)
 library(knitr)
 imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
-dbGetQuery(imcon$con,'SET NAMES utf8')
+capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
 show(src_tbls(imcon))
 ```
 
@@ -145,11 +145,22 @@ nmovies <- tbl(imcon,'title') %>%
 print(nmovies)
 ```
 
-Now some infor abouta some of the tables:
+Now some information about each of the tables:
 
 
 ```{r movie_tables,cache=TRUE,eval=TRUE,tidy=FALSE}
-print(tbl(imcon,'movie_US_gross'))
+showtable <- function(tnam) {
+  cat(sprintf('%8s:\n',tnam))
+	tbl(imcon,tnam) %>%
+		left_join(tbl(imcon,'title') %>% select(movie_id,title),by='movie_id') %>%
+    head() %>%
+    kable(caption=tnam) %>%
+		show()
+}
+
+movie_tables <- src_tbls(imcon) 
+movie_tables <- movie_tables[grepl('^movie_',movie_tables)]
+capt <- lapply(movie_tables,showtable)
 
 ```
 
