@@ -15,6 +15,7 @@ PKG_LCNAME 				:= $(shell echo $(PKG_NAME) | tr 'A-Z' 'a-z')
 ############## TARGETS ##############
 
 MD_TARGETS 			 = README.md seasonality.md
+HTML_TARGETS 		 = $(patsubst %.md,%.html,$(MD_TARGETS))
 
 ############## DEFAULT ##############
 
@@ -22,7 +23,7 @@ MD_TARGETS 			 = README.md seasonality.md
 
 ############## MARKERS ##############
 
-.PHONY   : help 
+.PHONY   : help viewit
 .SUFFIXES: 
 .PRECIOUS: 
 
@@ -34,11 +35,20 @@ help:  ## generate this help message
 $(MD_TARGETS) : %.md : %.Rmd
 	r -l knitr -e 'setwd("$(<D)");if (require(knitr)) { knit("$(<F)") }'
 
-viewit : README.md ## view the README.md locally
+$(HTML_TARGETS) : %.html : %.md
+	pandoc -f markdown_github -t html -o $@ $<
+
+%.view : %.html
+	xdg-open file://$$(pwd)/$<
+
+# this requires an internet connection, so suck it
+olviewit : README.md ## view the README.md locally
 	$(DOCKER) run -d -p 0.0.0.0:9929:6419 --name $(PKG_LCNAME) -v $$(pwd):/srv/grip/wiki:ro shabbychef/grip
 	xdg-open http://0.0.0.0:9929
 	@echo "to stop, run"
 	@echo 'docker rm $$(docker stop $(PKG_LCNAME))'
+
+viewit : README.view ## view the README.html locally w/out internet connection
 
 #for vim modeline: (do not edit)
 # vim:ts=2:sw=2:tw=129:fdm=marker:fmr=FOLDUP,UNFOLD:cms=#%s:tags=.tags;:syn=make:ft=make:ai:si:cin:nu:fo=croqt:cino=p0t0c5(0:
