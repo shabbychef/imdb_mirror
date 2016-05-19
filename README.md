@@ -158,22 +158,6 @@ library(dplyr)
 library(knitr)
 imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
 capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
-show(src_tbls(imcon))
-```
-
- [1] "aka_name"                  "aka_title"                 "cast_info"                
- [4] "char_name"                 "company_name"              "company_type"             
- [7] "info_type"                 "keyword"                   "movie_US_gross"           
-[10] "movie_admissions"          "movie_budgets"             "movie_companies"          
-[13] "movie_first_US_release"    "movie_gross"               "movie_info"               
-[16] "movie_info_idx"            "movie_keyword"             "movie_opening_weekend"    
-[19] "movie_premiere_US_release" "movie_raw_runtimes"        "movie_release_dates"      
-[22] "movie_rentals"             "movie_runtime"             "movie_votes"              
-[25] "movie_weekend_gross"       "name"                      "name_link"                
-[28] "person_info"               "role_type"                 "title"                    
-[31] "title_link"                "votes_per_year"           
-
-```r
 showtable <- function(tnam) {
   cat(sprintf('\n\n### %8s:\n',tnam))
 	tbl(imcon,tnam) %>%

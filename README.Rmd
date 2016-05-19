@@ -154,7 +154,6 @@ library(dplyr)
 library(knitr)
 imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
 capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
-show(src_tbls(imcon))
 showtable <- function(tnam) {
   cat(sprintf('\n\n### %8s:\n',tnam))
 	tbl(imcon,tnam) %>%
