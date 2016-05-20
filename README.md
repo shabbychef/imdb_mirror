@@ -414,9 +414,11 @@ library(knitr)
 imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
 capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
 
+# values over 300M are likely bogus
 budgets <- tbl(imcon,'movie_budgets') %>%
 	filter(units=='$') %>%
-	select(movie_id,amount)
+	select(movie_id,amount) %>%
+	filter(amount < 3e8)
 
 role_info <- tbl(imcon,'role_type') %>%
 	filter(role %in% c('actor','actress')) %>%
@@ -475,7 +477,7 @@ topc %>%
 |  yob|actor_name            | actor_roles| actor_total_budget|actress_name        | actress_roles| actress_total_budget|
 |----:|:---------------------|-----------:|------------------:|:-------------------|-------------:|--------------------:|
 | 1946|Welker, Frank         |         137|               8.27|Sarandon, Susan     |            52|                 1.63|
-| 1947|Ratzenberger, John    |          35|               2.88|Marshall, Mona      |            29|                 2.84|
+| 1947|Ratzenberger, John    |          35|               2.88|Marshall, Mona      |            28|                 2.34|
 | 1948|Jackson, Samuel L.    |          88|               4.80|Bates, Kathy        |            37|                 1.70|
 | 1949|Broadbent, Jim        |          42|               2.48|Weaver, Sigourney   |            43|                 1.76|
 | 1950|Coltrane, Robbie      |          25|               2.06|Walters, Julie      |            16|                 1.31|
@@ -495,25 +497,25 @@ topc %>%
 | 1964|Papajohn, Michael     |          52|               3.88|Janssen, Famke      |            31|                 1.51|
 | 1965|Downey Jr., Robert    |          53|               3.50|Lane, Diane         |            25|                 1.39|
 | 1966|Favreau, Jon          |          30|               2.15|Berry, Halle        |            36|                 2.60|
-| 1967|Ruffalo, Mark         |          38|               2.24|Derryberry, Debi    |            25|                 2.10|
+| 1967|Ruffalo, Mark         |          38|               2.24|Kidman, Nicole      |            38|                 1.95|
 | 1968|Vernon, Conrad        |          26|               3.75|Liu, Lucy           |            26|                 1.29|
 | 1969|Black, Jack           |          47|               2.58|Blanchett, Cate     |            33|                 2.48|
-| 1970|Damon, Matt           |          57|               2.97|Bahris, Fileena     |            16|                 1.72|
+| 1970|Damon, Matt           |          57|               2.97|Weisz, Rachel       |            23|                 1.48|
 | 1971|Renner, Jeremy        |          27|               2.59|Gugino, Carla       |            30|                 1.81|
 | 1972|Johnson, Dwayne       |          33|               1.91|Diaz, Cameron       |            35|                 1.90|
 | 1973|Marsden, James        |          37|               2.08|Wiig, Kristen       |            22|                 1.28|
 | 1974|Bale, Christian       |          33|               1.93|Banks, Elizabeth    |            33|                 1.80|
 | 1975|Maguire, Tobey        |          21|               1.81|Jolie, Angelina     |            34|                 2.32|
-| 1976|Cumberbatch, Benedict |          19|               1.79|Harris, Naomie      |            13|                 1.30|
-| 1977|Bloom, Orlando        |          18|               2.01|Washington, Kerry   |            20|                 0.86|
+| 1976|Cumberbatch, Benedict |          19|               1.79|Witherspoon, Reese  |            29|                 1.21|
+| 1977|Bloom, Orlando        |          17|               1.71|Washington, Kerry   |            20|                 0.86|
 | 1978|Mackie, Anthony       |          37|               2.64|Saldana, Zoe        |            25|                 1.32|
-| 1979|Jiskoot Jr., Bjorn    |           5|               1.64|Dawson, Rosario     |            33|                 1.25|
+| 1979|Evans, Luke           |          12|               1.62|Dawson, Rosario     |            33|                 1.25|
 | 1980|Tatum, Channing       |          31|               1.58|Green, Eva          |             9|                 0.96|
 | 1981|Evans, Chris          |          29|               3.20|Portman, Natalie    |            33|                 1.51|
 | 1982|Rogen, Seth           |          34|               1.84|Dunst, Kirsten      |            36|                 1.44|
 | 1983|Hemsworth, Chris      |          18|               2.03|Kunis, Mila         |            21|                 1.11|
 | 1984|Curry, Graham         |          16|               1.71|Johansson, Scarlett |            39|                 3.26|
-| 1985|Lutz, Kellan          |          14|               0.70|Knightley, Keira    |            19|                 1.30|
+| 1985|Lutz, Kellan          |          14|               0.70|Gadot, Gal          |            10|                 1.29|
 | 1986|LaBeouf, Shia         |          20|               1.49|Fox, Megan          |            11|                 0.82|
 | 1987|Felton, Tom           |          14|               1.28|Page, Ellen         |            12|                 0.82|
 | 1988|Integra, Raiden       |          15|               1.56|Stone, Emma         |            16|                 0.94|
@@ -524,6 +526,290 @@ topc %>%
 | 1993|Bright, Cameron       |          16|               0.80|Robb, AnnaSophia    |            11|                 0.42|
 | 1994|Melling, William      |           5|               0.70|Fanning, Dakota     |            21|                 0.86|
 | 1995|Jackson, Billy        |           6|               0.58|Hanratty, Sammi     |            14|                 0.87|
+
+### Try again
+
+That kind of works. However, the `cast_info` table also contains a field
+`nr_order` that lists the _order_ of an actor/actress in some films. 
+(In some titles, the `nr_order` field is not populated, or lists
+each cast member as 1.) Presumably lower order equates to higher billing
+in the cast and perhaps higher salary. Here we proceed to estimate
+total earned salary for actors and actresses by assuming salary is inversely
+proportional to the `nr_order`, as follows:
+
+1. For each film, fill out any missing `nr_order` with the largest known
+value for that film.
+1. Then substitute all missing `nr_order` values with a 1 (this only
+occurs for films with no recorded values for `nr_order`).
+1. Rescale the `nr_order` for each film so that they sum to 1.0 for
+each film.
+1. Multiply the rescaled `nr_order` by one-seventh the budget of the film.
+1. Aggregate over actors and actresses, then group by birth year and
+gender.
+
+
+```r
+library(RMySQL)
+library(dplyr)
+library(knitr)
+imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
+capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
+
+# values over 300M are likely bogus
+budgets <- tbl(imcon,'movie_budgets') %>%
+	filter(units=='$') %>%
+	select(movie_id,amount) %>%
+	filter(amount < 3e8)
+
+role_info <- tbl(imcon,'role_type') %>%
+	filter(role %in% c('actor','actress')) %>%
+	select(role_id)
+
+aggbudget <- tbl(imcon,'cast_info') %>%
+	inner_join(role_info,by='role_id') %>%
+	select(movie_id,person_id,role_id,nr_order) %>%
+	inner_join(budgets,by='movie_id') %>%
+	collect()
+
+# fill with max
+fix1 <- aggbudget %>%
+	group_by(movie_id) %>%
+	mutate(nr_order=pmin(nr_order,max(nr_order,na.rm=TRUE),na.rm=TRUE)) %>%
+	ungroup()
+
+# replace with 1
+fix2 <- fix1 %>% 
+	mutate(nr_order=pmin(nr_order,1,na.rm=TRUE)) 
+
+# rescale
+fix3 <- fix2 %>% 
+	mutate(scale_order=1 / (nr_order)) %>%
+	group_by(movie_id) %>%
+	mutate(scale_order=scale_order / sum(scale_order,na.rm=FALSE)) %>%
+  ungroup()
+
+# multiply by budget, divide by 7, aggregate over people
+bbyname <- fix3 %>% 
+	mutate(salary=(1.0/7.0) * scale_order * amount) %>%
+	group_by(person_id) %>%
+	summarize(totsalary=sum(salary),
+    totroles=n()) %>%
+	ungroup()
+
+# get name info
+naminfo <- tbl(imcon,'name') %>%
+	select(person_id,name,dob,gender) %>%
+	filter(!is.null(dob)) %>%
+	collect()
+
+topcast <- bbyname %>% 
+	inner_join(naminfo,by='person_id') %>%
+	mutate(yob=as.numeric(gsub('^((19|20)\\d{2}).+','\\1',dob))) %>%
+	filter(!is.na(yob)) %>%
+  group_by(yob,gender) %>%
+  arrange(desc(totsalary)) %>%
+  summarize(totbudget=first(totsalary) / 1e6,
+    topname=first(name),
+    toproles=first(totroles)) %>%
+  ungroup()
+
+
+# I wish there were an easy way to do this via tidyr,
+# and maybe there is...
+topm <- topcast %>% 
+  select(yob,topname,toproles,totbudget,gender) %>% 
+	filter(gender=='m')
+topf <- topcast %>% 
+  select(yob,topname,toproles,totbudget,gender) %>% 
+	filter(gender=='f')
+
+topc <- inner_join(topm %>% select(-gender),topf %>% select(-gender),by='yob') %>%
+	rename(actor_total_budget=totbudget.x,
+    actor_name=topname.x,
+    actor_roles=toproles.x,
+    actress_total_budget=totbudget.y,
+    actress_name=topname.y,
+    actress_roles=toproles.y)
+
+topc %>% 
+	filter(yob > 1945,yob <= 1995) %>%
+  kable()
+```
+
+
+
+|  yob|actor_name                | actor_roles| actor_total_budget|actress_name         | actress_roles| actress_total_budget|
+|----:|:-------------------------|-----------:|------------------:|:--------------------|-------------:|--------------------:|
+| 1946|Welker, Frank             |         137|              23.09|Darling, Jennifer    |            20|                 3.97|
+| 1947|Ratzenberger, John        |          35|               8.68|Marshall, Mona       |            28|                 6.29|
+| 1948|Jackson, Samuel L.        |          88|              10.23|Bates, Kathy         |            37|                 3.89|
+| 1949|Broadbent, Jim            |          42|               5.56|Weaver, Sigourney    |            43|                 5.20|
+| 1950|Perlman, Ron              |          49|               6.45|Walters, Julie       |            16|                 3.87|
+| 1951|Williams, Robin           |          58|               6.21|MacNeille, Tress     |            35|                 4.08|
+| 1952|Cummings, Jim             |          56|              14.40|Newman, Laraine      |            32|                 7.55|
+| 1953|Molina, Alfred            |          35|               4.29|Soucie, Kath         |            30|                 4.39|
+| 1954|Rabson, Jan               |          32|               6.68|O'Hara, Catherine    |            30|                 3.94|
+| 1955|Willis, Bruce             |          76|               7.48|Goldberg, Whoopi     |            45|                 3.22|
+| 1956|Hanks, Tom                |          53|               6.42|Staunton, Imelda     |            20|                 2.94|
+| 1957|Buscemi, Steve            |          63|               5.56|Hoffman, Bridget     |            30|                 4.74|
+| 1958|Oldman, Gary              |          42|               6.65|Pfeiffer, Michelle   |            32|                 3.78|
+| 1959|Kilmer, Val               |          55|               5.60|Thompson, Emma       |            27|                 4.69|
+| 1960|Banderas, Antonio         |          51|               6.70|Moore, Julianne      |            51|                 3.77|
+| 1961|Murphy, Eddie             |          58|               7.78|Hunt, Bonnie         |            20|                 3.30|
+| 1962|Baker, Dee Bradley        |          58|               7.48|Yeoh, Michelle       |            17|                 3.64|
+| 1963|Harnell, Jess             |          42|              10.18|Shue, Elisabeth      |            24|                 2.11|
+| 1964|Bergen, Bob               |          42|              10.25|Bullock, Sandra      |            32|                 4.84|
+| 1965|Stiller, Ben              |          48|               5.90|Lane, Diane          |            25|                 2.52|
+| 1966|Sturgis, Gary Anthony     |          19|              20.92|Berry, Halle         |            36|                 4.62|
+| 1967|Statham, Jason            |          32|              25.44|Kidman, Nicole       |            38|                 4.50|
+| 1968|Vernon, Conrad            |          26|              12.60|Liu, Lucy            |            26|                 3.90|
+| 1969|Black, Jack               |          47|               6.54|Blanchett, Cate      |            33|                 5.42|
+| 1970|Whiting, Al               |          12|              29.91|Weisz, Rachel        |            23|                 4.01|
+| 1971|Stepanek, Brian           |          14|               5.85|Poehler, Amy         |            25|                 2.93|
+| 1972|Law, Jude                 |          29|               4.74|Diaz, Cameron        |            35|                 3.80|
+| 1973|McKidd, Kevin             |          17|               4.11|Wiig, Kristen        |            22|                 4.92|
+| 1974|Ribisi, Giovanni          |          37|               3.56|Banks, Elizabeth     |            33|                 2.40|
+| 1975|Sabongui, Patrick         |          21|               2.98|Jolie, Angelina      |            34|                 6.34|
+| 1976|Reynolds, Ryan            |          26|               5.38|Witherspoon, Reese   |            29|                 2.66|
+| 1977|Bloom, Orlando            |          17|               3.64|Wahlgren, Kari       |             9|                 2.64|
+| 1978|Hader, Bill               |          31|               4.38|Mendez, Denny        |             4|                 3.25|
+| 1979|Carew, John               |           1|               3.29|Hudson, Kate         |            25|                 2.68|
+| 1980|Tatum, Channing           |          31|               2.86|Aguilera, Christina  |             5|                 2.71|
+| 1981|Miller, T.J.              |          16|               4.86|Solomon, Christine   |             4|                 3.81|
+| 1982|Rogen, Seth               |          34|               5.21|Dunst, Kirsten       |            36|                 2.57|
+| 1983|Zelocchi, Enzo            |          10|              23.59|Ebanks, Selita       |             3|                 3.72|
+| 1984|Curry, Graham             |          16|               2.17|Johansson, Scarlett  |            39|                 4.77|
+| 1985|Duke, Clark               |          10|               2.84|Kendrick, Anna       |            22|                 2.57|
+| 1986|LaBeouf, Shia             |          20|               2.52|Kanda, Sayaka        |             3|                 1.66|
+| 1987|Felton, Tom               |          14|               2.53|Liu, Yifei           |             5|                 4.76|
+| 1988|Integra, Raiden           |          15|               1.97|Stone, Emma          |            16|                 3.43|
+| 1989|Mintz-Plasse, Christopher |          19|               4.82|Panettiere, Hayden   |            13|                 1.67|
+| 1990|Jefferies, Marc John      |          16|               2.01|Stewart, Kristen     |            24|                 3.15|
+| 1991|Keynes, Skandar           |           3|               1.39|Jackson, Amy         |             2|                 1.77|
+| 1992|Hale, Alex                |           4|              45.86|Olszanska, Michalina |             3|                 3.88|
+| 1993|Bright, Cameron           |          16|               1.66|Robb, AnnaSophia     |            11|                 0.99|
+| 1994|Jones, Tyler Patrick      |           7|               1.59|Fanning, Dakota      |            21|                 2.53|
+| 1995|Majors, Austin            |           6|               0.94|Hanratty, Sammi      |            14|                 1.44|
+
+-------------
+
+## Dominant actors over time
+
+Let us consider this budget calculation another way: compute the pseudo-salary for each
+actor and actress as a function of production year of the film, 
+then compute a 7 year rolling mean for each actor and actress, and 
+plot the dominant players over time.
+
+
+```r
+library(RMySQL)
+library(dplyr)
+library(knitr)
+imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
+capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
+
+# values over 300M are likely bogus
+budgets <- tbl(imcon,'movie_budgets') %>%
+	filter(units=='$') %>%
+	select(movie_id,amount) %>%
+	filter(amount < 3e8)
+
+role_info <- tbl(imcon,'role_type') %>%
+	filter(role %in% c('actor','actress')) %>%
+	select(role_id)
+
+movie_yr <- tbl(imcon,'title') %>%
+	select(movie_id,production_year) %>%
+	rename(year=production_year) 
+
+aggbudget <- tbl(imcon,'cast_info') %>%
+	inner_join(role_info,by='role_id') %>%
+	select(movie_id,person_id,role_id,nr_order) %>%
+	inner_join(budgets,by='movie_id') %>%
+  inner_join(movie_yr,by='movie_id') %>%
+	collect()
+
+# fill with max
+fix1 <- aggbudget %>%
+	group_by(movie_id) %>%
+	mutate(nr_order=pmin(nr_order,max(nr_order,na.rm=TRUE),na.rm=TRUE)) %>%
+	ungroup()
+
+# replace with 1
+fix2 <- fix1 %>% 
+	mutate(nr_order=pmin(nr_order,1,na.rm=TRUE)) 
+
+# rescale
+fix3 <- fix2 %>% 
+	mutate(scale_order=1 / (nr_order)) %>%
+	group_by(movie_id) %>%
+	mutate(scale_order=scale_order / sum(scale_order,na.rm=FALSE)) %>%
+  ungroup()
+
+# multiply by budget, divide by 7, aggregate over people, years, summing
+bbynameyr <- fix3 %>% 
+	mutate(salary=(1.0/7.0) * scale_order * amount) %>%
+	group_by(person_id,year) %>%
+	summarize(totsalary=sum(salary),
+    totroles=n()) %>%
+	ungroup()
+
+# this is godawful slow and terrible
+pyrs <- 1945:2016
+rollsum <- function(yrnum,tots,window=5) {
+  yrv <- rep(0,length(pyrs))
+	isin <- pyrs %in% yrnum
+  yrv[isin] <- tots[yrnum %in% pyrs]
+  cyrv <- cumsum(yrv)
+  rv <- data.frame(yr=pyrs[window:length(pyrs)],dsum=diff(cyrv,lag=window-1))
+  rv[rv$dsum > 0,]
+}
+
+aggbyyr <- bbynameyr %>%
+  filter(totsalary > 1000) %>%
+	arrange(year) %>%
+	group_by(person_id) %>%
+	do(rollsum(.$year,.$totsalary)) %>%
+  ungroup() %>%
+	filter(dsum > 0)
+
+# select anyone who has been in the top 2 in any year, by gender
+top2 <- aggbyyr %>% 
+	inner_join(naminfo %>% select(person_id,gender),by='person_id') %>%
+  arrange(desc(dsum)) %>%
+	group_by(yr,gender) %>% 
+  summarize(cutoff=nth(dsum,2)) %>%
+  ungroup()
+
+intop2 <- aggbyyr %>% 
+	inner_join(naminfo %>% select(person_id,gender),by='person_id') %>%
+  inner_join(top2,by=c('yr','gender')) %>%
+  filter(dsum >= cutoff) %>%
+	distinct(person_id)
+
+# now get the top 
+topdogs <- aggbyyr %>%
+	inner_join(naminfo %>% select(person_id,name,dob,gender),by='person_id') %>%
+  inner_join(intop2 %>% select(person_id),by='person_id')
+```
+
+
+```r
+library(ggplot2)
+
+ph <- ggplot(topdogs,aes(x=yr,y=dsum,group=name,color=name,label=name)) +
+  geom_line() + 
+  geom_text(check_overlap=TRUE) +
+	labs(x='year',y='rolling quasi-salary ($)') +
+  facet_grid(. ~ gender) + 
+  scale_y_log10() + 
+  guides(col=FALSE)
+
+print(ph)
+```
+
+<img src="figure/README_starpower_III_plot-1.png" title="plot of chunk starpower_III_plot" alt="plot of chunk starpower_III_plot" width="700px" height="600px" />
+
 
 -------------
 

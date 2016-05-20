@@ -10,7 +10,8 @@ opts_chunk$set(warning=FALSE,message=FALSE)
 opts_chunk$set(cache=TRUE,cache.path="cache/")
 
 #opts_chunk$set(fig.path="figure/",dev=c("pdf","cairo_ps"))
-opts_chunk$set(fig.path="github_extra/figure/",dev=c("png"))
+#opts_chunk$set(fig.path="github_extra/figure/",dev=c("png"))
+opts_chunk$set(fig.path="figure/README_",dev=c("png"))
 opts_chunk$set(fig.width=7,fig.height=6,dpi=100,out.width='700px',out.height='600px')
 
 # doing this means that png files are made of figures;
@@ -188,9 +189,11 @@ library(knitr)
 imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
 capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
 
+# values over 300M are likely bogus
 budgets <- tbl(imcon,'movie_budgets') %>%
 	filter(units=='$') %>%
-	select(movie_id,amount)
+	select(movie_id,amount) %>%
+	filter(amount < 3e8)
 
 role_info <- tbl(imcon,'role_type') %>%
 	filter(role %in% c('actor','actress')) %>%
@@ -243,6 +246,230 @@ topc %>%
 	filter(yob > 1945,yob <= 1995) %>%
   kable()
 ```
+
+### Try again
+
+That kind of works. However, the `cast_info` table also contains a field
+`nr_order` that lists the _order_ of an actor/actress in some films. 
+(In some titles, the `nr_order` field is not populated, or lists
+each cast member as 1.) Presumably lower order equates to higher billing
+in the cast and perhaps higher salary. Here we proceed to estimate
+total earned salary for actors and actresses by assuming salary is inversely
+proportional to the `nr_order`, as follows:
+
+1. For each film, fill out any missing `nr_order` with the largest known
+value for that film.
+1. Then substitute all missing `nr_order` values with a 1 (this only
+occurs for films with no recorded values for `nr_order`).
+1. Rescale the `nr_order` for each film so that they sum to 1.0 for
+each film.
+1. Multiply the rescaled `nr_order` by one-seventh the budget of the film.
+1. Aggregate over actors and actresses, then group by birth year and
+gender.
+
+```{r starpower_II,cache=TRUE,eval=TRUE,tidy=FALSE}
+library(RMySQL)
+library(dplyr)
+library(knitr)
+imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
+capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
+
+# values over 300M are likely bogus
+budgets <- tbl(imcon,'movie_budgets') %>%
+	filter(units=='$') %>%
+	select(movie_id,amount) %>%
+	filter(amount < 3e8)
+
+role_info <- tbl(imcon,'role_type') %>%
+	filter(role %in% c('actor','actress')) %>%
+	select(role_id)
+
+aggbudget <- tbl(imcon,'cast_info') %>%
+	inner_join(role_info,by='role_id') %>%
+	select(movie_id,person_id,role_id,nr_order) %>%
+	inner_join(budgets,by='movie_id') %>%
+	collect()
+
+# fill with max
+fix1 <- aggbudget %>%
+	group_by(movie_id) %>%
+	mutate(nr_order=pmin(nr_order,max(nr_order,na.rm=TRUE),na.rm=TRUE)) %>%
+	ungroup()
+
+# replace with 1
+fix2 <- fix1 %>% 
+	mutate(nr_order=pmin(nr_order,1,na.rm=TRUE)) 
+
+# rescale
+fix3 <- fix2 %>% 
+	mutate(scale_order=1 / (nr_order)) %>%
+	group_by(movie_id) %>%
+	mutate(scale_order=scale_order / sum(scale_order,na.rm=FALSE)) %>%
+  ungroup()
+
+# multiply by budget, divide by 7, aggregate over people
+bbyname <- fix3 %>% 
+	mutate(salary=(1.0/7.0) * scale_order * amount) %>%
+	group_by(person_id) %>%
+	summarize(totsalary=sum(salary),
+    totroles=n()) %>%
+	ungroup()
+
+# get name info
+naminfo <- tbl(imcon,'name') %>%
+	select(person_id,name,dob,gender) %>%
+	filter(!is.null(dob)) %>%
+	collect()
+
+topcast <- bbyname %>% 
+	inner_join(naminfo,by='person_id') %>%
+	mutate(yob=as.numeric(gsub('^((19|20)\\d{2}).+','\\1',dob))) %>%
+	filter(!is.na(yob)) %>%
+  group_by(yob,gender) %>%
+  arrange(desc(totsalary)) %>%
+  summarize(totbudget=first(totsalary) / 1e6,
+    topname=first(name),
+    toproles=first(totroles)) %>%
+  ungroup()
+
+
+# I wish there were an easy way to do this via tidyr,
+# and maybe there is...
+topm <- topcast %>% 
+  select(yob,topname,toproles,totbudget,gender) %>% 
+	filter(gender=='m')
+topf <- topcast %>% 
+  select(yob,topname,toproles,totbudget,gender) %>% 
+	filter(gender=='f')
+
+topc <- inner_join(topm %>% select(-gender),topf %>% select(-gender),by='yob') %>%
+	rename(actor_total_budget=totbudget.x,
+    actor_name=topname.x,
+    actor_roles=toproles.x,
+    actress_total_budget=totbudget.y,
+    actress_name=topname.y,
+    actress_roles=toproles.y)
+
+topc %>% 
+	filter(yob > 1945,yob <= 1995) %>%
+  kable()
+```
+
+-------------
+
+## Dominant actors over time
+
+Let us consider this budget calculation another way: compute the pseudo-salary for each
+actor and actress as a function of production year of the film, 
+then compute a 7 year rolling mean for each actor and actress, and 
+plot the dominant players over time.
+
+```{r starpower_III,cache=TRUE,eval=TRUE,tidy=FALSE,results='asis'}
+library(RMySQL)
+library(dplyr)
+library(knitr)
+imcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
+capt <- dbGetQuery(imcon$con,'SET NAMES utf8')
+
+# values over 300M are likely bogus
+budgets <- tbl(imcon,'movie_budgets') %>%
+	filter(units=='$') %>%
+	select(movie_id,amount) %>%
+	filter(amount < 3e8)
+
+role_info <- tbl(imcon,'role_type') %>%
+	filter(role %in% c('actor','actress')) %>%
+	select(role_id)
+
+movie_yr <- tbl(imcon,'title') %>%
+	select(movie_id,production_year) %>%
+	rename(year=production_year) 
+
+aggbudget <- tbl(imcon,'cast_info') %>%
+	inner_join(role_info,by='role_id') %>%
+	select(movie_id,person_id,role_id,nr_order) %>%
+	inner_join(budgets,by='movie_id') %>%
+  inner_join(movie_yr,by='movie_id') %>%
+	collect()
+
+# fill with max
+fix1 <- aggbudget %>%
+	group_by(movie_id) %>%
+	mutate(nr_order=pmin(nr_order,max(nr_order,na.rm=TRUE),na.rm=TRUE)) %>%
+	ungroup()
+
+# replace with 1
+fix2 <- fix1 %>% 
+	mutate(nr_order=pmin(nr_order,1,na.rm=TRUE)) 
+
+# rescale
+fix3 <- fix2 %>% 
+	mutate(scale_order=1 / (nr_order)) %>%
+	group_by(movie_id) %>%
+	mutate(scale_order=scale_order / sum(scale_order,na.rm=FALSE)) %>%
+  ungroup()
+
+# multiply by budget, divide by 7, aggregate over people, years, summing
+bbynameyr <- fix3 %>% 
+	mutate(salary=(1.0/7.0) * scale_order * amount) %>%
+	group_by(person_id,year) %>%
+	summarize(totsalary=sum(salary),
+    totroles=n()) %>%
+	ungroup()
+
+# this is godawful slow and terrible
+pyrs <- 1945:2016
+rollsum <- function(yrnum,tots,window=5) {
+  yrv <- rep(0,length(pyrs))
+	isin <- pyrs %in% yrnum
+  yrv[isin] <- tots[yrnum %in% pyrs]
+  cyrv <- cumsum(yrv)
+  rv <- data.frame(yr=pyrs[window:length(pyrs)],dsum=diff(cyrv,lag=window-1))
+  rv[rv$dsum > 0,]
+}
+
+aggbyyr <- bbynameyr %>%
+  filter(totsalary > 1000) %>%
+	arrange(year) %>%
+	group_by(person_id) %>%
+	do(rollsum(.$year,.$totsalary)) %>%
+  ungroup() %>%
+	filter(dsum > 0)
+
+# select anyone who has been in the top 2 in any year, by gender
+top2 <- aggbyyr %>% 
+	inner_join(naminfo %>% select(person_id,gender),by='person_id') %>%
+  arrange(desc(dsum)) %>%
+	group_by(yr,gender) %>% 
+  summarize(cutoff=nth(dsum,2)) %>%
+  ungroup()
+
+intop2 <- aggbyyr %>% 
+	inner_join(naminfo %>% select(person_id,gender),by='person_id') %>%
+  inner_join(top2,by=c('yr','gender')) %>%
+  filter(dsum >= cutoff) %>%
+	distinct(person_id)
+
+# now get the top 
+topdogs <- aggbyyr %>%
+	inner_join(naminfo %>% select(person_id,name,dob,gender),by='person_id') %>%
+  inner_join(intop2 %>% select(person_id),by='person_id')
+```
+
+```{r starpower_III_plot,cache=TRUE,eval=TRUE,tidy=FALSE}
+library(ggplot2)
+
+ph <- ggplot(topdogs,aes(x=yr,y=dsum,group=name,color=name,label=name)) +
+  geom_line() + 
+  geom_text(check_overlap=TRUE) +
+	labs(x='year',y='rolling quasi-salary ($)') +
+  facet_grid(. ~ gender) + 
+  scale_y_log10() + 
+  guides(col=FALSE)
+
+print(ph)
+```
+
 
 -------------
 
