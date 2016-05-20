@@ -697,7 +697,7 @@ topc %>%
 
 Let us consider this budget calculation another way: compute the pseudo-salary for each
 actor and actress as a function of production year of the film, 
-then compute a 7 year rolling mean for each actor and actress, and 
+then compute a 9 year rolling mean for each actor and actress, and 
 plot the dominant players over time.
 
 
@@ -756,7 +756,7 @@ bbynameyr <- fix3 %>%
 
 # this is godawful slow and terrible
 pyrs <- 1945:2016
-rollsum <- function(yrnum,tots,window=5) {
+rollsum <- function(yrnum,tots,window=9) {
   yrv <- rep(0,length(pyrs))
 	isin <- pyrs %in% yrnum
   yrv[isin] <- tots[yrnum %in% pyrs]
@@ -773,24 +773,26 @@ aggbyyr <- bbynameyr %>%
   ungroup() %>%
 	filter(dsum > 0)
 
-# select anyone who has been in the top 2 in any year, by gender
-top2 <- aggbyyr %>% 
+Kval <- 1
+
+# select anyone who has been in the top K in any year, by gender
+topK <- aggbyyr %>% 
 	inner_join(naminfo %>% select(person_id,gender),by='person_id') %>%
   arrange(desc(dsum)) %>%
 	group_by(yr,gender) %>% 
-  summarize(cutoff=nth(dsum,2)) %>%
+  summarize(cutoff=nth(dsum,Kval)) %>%
   ungroup()
 
-intop2 <- aggbyyr %>% 
+intopK <- aggbyyr %>% 
 	inner_join(naminfo %>% select(person_id,gender),by='person_id') %>%
-  inner_join(top2,by=c('yr','gender')) %>%
+  inner_join(topK,by=c('yr','gender')) %>%
   filter(dsum >= cutoff) %>%
 	distinct(person_id)
 
 # now get the top 
 topdogs <- aggbyyr %>%
 	inner_join(naminfo %>% select(person_id,name,dob,gender),by='person_id') %>%
-  inner_join(intop2 %>% select(person_id),by='person_id')
+  inner_join(intopK %>% select(person_id),by='person_id')
 ```
 
 
@@ -808,7 +810,7 @@ ph <- ggplot(topdogs,aes(x=yr,y=dsum,group=name,color=name,label=name)) +
 print(ph)
 ```
 
-<img src="figure/README_starpower_III_plot-1.png" title="plot of chunk starpower_III_plot" alt="plot of chunk starpower_III_plot" width="700px" height="600px" />
+<img src="figure/README_starpower_III_plot-1.png" title="plot of chunk starpower_III_plot" alt="plot of chunk starpower_III_plot" width="900px" height="600px" />
 
 
 -------------
