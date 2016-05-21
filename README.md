@@ -754,7 +754,7 @@ bbynameyr <- fix3 %>%
     totroles=n()) %>%
 	ungroup()
 
-# this is godawful slow and terrible
+# this is godawful slow and terrible: compute salary on a rolling window
 pyrs <- 1945:2016
 rollsum <- function(yrnum,tots,window=9) {
   yrv <- rep(0,length(pyrs))
@@ -772,7 +772,9 @@ aggbyyr <- bbynameyr %>%
 	do(rollsum(.$year,.$totsalary)) %>%
   ungroup() %>%
 	filter(dsum > 0)
+```
 
+```r
 Kval <- 1
 
 # select anyone who has been in the top K in any year, by gender
@@ -793,8 +795,148 @@ intopK <- aggbyyr %>%
 topdogs <- aggbyyr %>%
 	inner_join(naminfo %>% select(person_id,name,dob,gender),by='person_id') %>%
   inner_join(intopK %>% select(person_id),by='person_id')
+
+topdogs %>% 
+	group_by(yr,gender) %>%
+	arrange(desc(dsum)) %>%
+	summarize(tname=first(name)) %>%
+  ungroup() %>%
+  rename(name=tname) %>%
+  kable()
 ```
 
+
+
+|   yr|gender |name               |
+|----:|:------|:------------------|
+| 1953|f      |Flowers, Bess      |
+| 1953|m      |Harris, Sam        |
+| 1954|f      |Flowers, Bess      |
+| 1954|m      |Harris, Sam        |
+| 1955|f      |Flowers, Bess      |
+| 1955|m      |Thompson, Bill     |
+| 1956|f      |Flowers, Bess      |
+| 1956|m      |Thompson, Bill     |
+| 1957|f      |Kerr, Deborah      |
+| 1957|m      |Mitchum, Robert    |
+| 1958|f      |Kerr, Deborah      |
+| 1958|m      |Mitchum, Robert    |
+| 1959|f      |Kerr, Deborah      |
+| 1959|m      |Mitchum, Robert    |
+| 1960|f      |Kerr, Deborah      |
+| 1960|m      |Mitchum, Robert    |
+| 1961|f      |Kerr, Deborah      |
+| 1961|m      |Mitchum, Robert    |
+| 1962|f      |Kerr, Deborah      |
+| 1962|m      |Mitchum, Robert    |
+| 1963|f      |Kerr, Deborah      |
+| 1963|m      |Mitchum, Robert    |
+| 1964|f      |Hepburn, Audrey    |
+| 1964|m      |Mitchum, Robert    |
+| 1965|f      |Hepburn, Audrey    |
+| 1965|m      |Rietty, Robert     |
+| 1966|f      |Taylor, Elizabeth  |
+| 1966|m      |Rietty, Robert     |
+| 1967|f      |Taylor, Elizabeth  |
+| 1967|m      |Rietty, Robert     |
+| 1968|f      |Taylor, Elizabeth  |
+| 1968|m      |Burton, Richard    |
+| 1969|f      |Taylor, Elizabeth  |
+| 1969|m      |Rietty, Robert     |
+| 1970|f      |Taylor, Elizabeth  |
+| 1970|m      |Rietty, Robert     |
+| 1971|f      |Taylor, Elizabeth  |
+| 1971|m      |Rietty, Robert     |
+| 1972|f      |Taylor, Elizabeth  |
+| 1972|m      |Rietty, Robert     |
+| 1973|f      |Taylor, Elizabeth  |
+| 1973|m      |Rietty, Robert     |
+| 1974|f      |Taylor, Elizabeth  |
+| 1974|m      |Marvin, Lee        |
+| 1975|f      |Taylor, Elizabeth  |
+| 1975|m      |Marvin, Lee        |
+| 1976|f      |Taylor, Elizabeth  |
+| 1976|m      |Rietty, Robert     |
+| 1977|f      |Taylor, Elizabeth  |
+| 1977|m      |Donner, Robert     |
+| 1978|f      |Taylor, Elizabeth  |
+| 1978|m      |Hill, Arthur       |
+| 1979|f      |Mimieux, Yvette    |
+| 1979|m      |Pickens, Slim      |
+| 1980|f      |Mimieux, Yvette    |
+| 1980|m      |Pickens, Slim      |
+| 1981|f      |Bisset, Jacqueline |
+| 1981|m      |Morse, Ralph       |
+| 1982|f      |Perrine, Valerie   |
+| 1982|m      |Morse, Ralph       |
+| 1983|f      |Perrine, Valerie   |
+| 1983|m      |Morse, Ralph       |
+| 1984|f      |Perrine, Valerie   |
+| 1984|m      |Lyons, Derek       |
+| 1985|f      |Ruslanova, Nina    |
+| 1985|m      |Lyons, Derek       |
+| 1986|f      |Ruslanova, Nina    |
+| 1986|m      |Lyons, Derek       |
+| 1987|f      |Ruslanova, Nina    |
+| 1987|m      |Lyons, Derek       |
+| 1988|f      |Ruslanova, Nina    |
+| 1988|m      |Welker, Frank      |
+| 1989|f      |Ruslanova, Nina    |
+| 1989|m      |Welker, Frank      |
+| 1990|f      |Ruslanova, Nina    |
+| 1990|m      |Welker, Frank      |
+| 1991|f      |Ruslanova, Nina    |
+| 1991|m      |Welker, Frank      |
+| 1992|f      |Ruslanova, Nina    |
+| 1992|m      |Welker, Frank      |
+| 1993|f      |Weaver, Sigourney  |
+| 1993|m      |Welker, Frank      |
+| 1994|f      |Pfeiffer, Michelle |
+| 1994|m      |Welker, Frank      |
+| 1995|f      |Weaver, Sigourney  |
+| 1995|m      |Welker, Frank      |
+| 1996|f      |Hamilton, Linda    |
+| 1996|m      |Welker, Frank      |
+| 1997|f      |Hamilton, Linda    |
+| 1997|m      |Welker, Frank      |
+| 1998|f      |Hamilton, Linda    |
+| 1998|m      |Welker, Frank      |
+| 1999|f      |Bergman, Mary Kay  |
+| 1999|m      |Welker, Frank      |
+| 2000|f      |Bergman, Mary Kay  |
+| 2000|m      |Welker, Frank      |
+| 2001|f      |Bergman, Mary Kay  |
+| 2001|m      |Welker, Frank      |
+| 2002|f      |McGowan, Mickie    |
+| 2002|m      |Welker, Frank      |
+| 2003|f      |McGowan, Mickie    |
+| 2003|m      |Cummings, Jim      |
+| 2004|f      |McGowan, Mickie    |
+| 2004|m      |Cummings, Jim      |
+| 2005|f      |McGowan, Mickie    |
+| 2005|m      |Cummings, Jim      |
+| 2006|f      |McGowan, Mickie    |
+| 2006|m      |Cummings, Jim      |
+| 2007|f      |MacNeille, Tress   |
+| 2007|m      |Cummings, Jim      |
+| 2008|f      |Jolie, Angelina    |
+| 2008|m      |Vernon, Conrad     |
+| 2009|f      |McGowan, Mickie    |
+| 2009|m      |Vernon, Conrad     |
+| 2010|f      |Newman, Laraine    |
+| 2010|m      |Vernon, Conrad     |
+| 2011|f      |Newman, Laraine    |
+| 2011|m      |Vernon, Conrad     |
+| 2012|f      |Newman, Laraine    |
+| 2012|m      |Vernon, Conrad     |
+| 2013|f      |Newman, Laraine    |
+| 2013|m      |Welker, Frank      |
+| 2014|f      |Newman, Laraine    |
+| 2014|m      |Welker, Frank      |
+| 2015|f      |Newman, Laraine    |
+| 2015|m      |Zelocchi, Enzo     |
+| 2016|f      |Wiig, Kristen      |
+| 2016|m      |Hale, Alex         |
 
 ```r
 library(ggplot2)

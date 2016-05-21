@@ -417,7 +417,7 @@ bbynameyr <- fix3 %>%
     totroles=n()) %>%
 	ungroup()
 
-# this is godawful slow and terrible
+# this is godawful slow and terrible: compute salary on a rolling window
 pyrs <- 1945:2016
 rollsum <- function(yrnum,tots,window=9) {
   yrv <- rep(0,length(pyrs))
@@ -435,7 +435,8 @@ aggbyyr <- bbynameyr %>%
 	do(rollsum(.$year,.$totsalary)) %>%
   ungroup() %>%
 	filter(dsum > 0)
-
+```
+```{r starpower_III_picktop,cache=TRUE,eval=TRUE,tidy=FALSE,results='asis'}
 Kval <- 1
 
 # select anyone who has been in the top K in any year, by gender
@@ -456,8 +457,15 @@ intopK <- aggbyyr %>%
 topdogs <- aggbyyr %>%
 	inner_join(naminfo %>% select(person_id,name,dob,gender),by='person_id') %>%
   inner_join(intopK %>% select(person_id),by='person_id')
-```
 
+topdogs %>% 
+	group_by(yr,gender) %>%
+	arrange(desc(dsum)) %>%
+	summarize(tname=first(name)) %>%
+  ungroup() %>%
+  rename(name=tname) %>%
+  kable()
+```
 ```{r starpower_III_plot,cache=TRUE,eval=TRUE,tidy=FALSE}
 library(ggplot2)
 
