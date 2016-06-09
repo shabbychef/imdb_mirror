@@ -1,0 +1,4 @@
+#libpng12-dev
+#libcairo2-dev
+#xvfb
+libmysqlclient-dev 

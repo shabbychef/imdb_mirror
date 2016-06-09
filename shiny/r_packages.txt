@@ -1,0 +1,10 @@
+#docopt
+shinythemes
+RMySQL
+reshape2
+ggplot2
+dplyr
+#Matrix
+#Cairo
+#irlba
+#maxLik

@@ -34,9 +34,20 @@ mysqldb:
   - 0.0.0.0:23306:3306
   environment:
   - MYSQL_ROOT_PASSWORD=youdonotneedthis
+  - MYSQL_USER=moe
+  - MYSQL_PASSWORD=movies4me
   volumes:
   - ./mysql_confd:/etc/mysql/conf.d:ro
   - ./mysql_init:/docker-entrypoint-initdb.d:ro 
+shiny:
+  extends:
+    file: common.yml
+    service: common
+  build: ./shiny
+  links: 
+  - mysqldb:mysqldb
+  ports:
+  - 0.0.0.0:19191:5555
 
 #for vim modeline: (do not edit)
 # vim:ts=2:sw=2:tw=79:fdm=marker:fmr=FOLDUP,UNFOLD:cms=#%s:tags=.tags;:syn=yaml:ft=yaml:et:ai:si:cin:nu:fo=croqt:cino=p0t0c5(0:ff=unix
