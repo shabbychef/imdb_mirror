@@ -13,6 +13,7 @@ library(shinythemes)
 library(DT)
 
 now.date <- Sys.Date()
+current.year <- as.numeric(format(Sys.time(),'%Y'))
 
 # Define UI for ...
 shinyUI(
@@ -34,7 +35,7 @@ shinyUI(
 		sidebarPanel(#FOLDUP
 			width=2,
 			h3('Parameters'),
-			sliderInput("prod_year","Production Year:",sep='',min=1900,max=2015,value=c(2005,2015)),
+			sliderInput("prod_year","Production Year:",sep='',min=1900,max=current.year,value=c(current.year-10,current.year)),
 			textInput("title_grep","Title:",value="Lords? of "),
 			checkboxInput("primary_title_only","Search primary titles only",TRUE),
 			textInput("cast_grep","Cast member:",value=""),

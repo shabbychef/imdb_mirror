@@ -123,6 +123,33 @@ Now connect to the database and poke around:
 mysql -s --host=0.0.0.0 --port=23306 --user=moe --password=movies4me IMDB
 ```
 
+## Shiny frontend
+
+The `docker-compose` command now also supports a shiny database front end. If you wish to 
+turn it off, comment out the following stanza from `docker-compose.yml` (I do not know
+of a better solution at the moment):
+
+```{r docompose1,engine='bash',comment='bash',cache=TRUE,eval=FALSE}
+# comment it out by putting '#' in front, like a nice yaml file.
+shiny:
+  extends:
+    file: common.yml
+    service: common
+  build: ./shiny
+  links: 
+  - mysqldb:mysqldb
+  ports:
+  - 0.0.0.0:19191:5555
+```
+
+If you _do_ want to use the shiny frontend, once the image is running, go to
+[localhost port 19191](http://localhost:19191), and poke around. You can
+grep for title, cast members, directors, restrict by votes per year and
+production year. When you select a row from the table in the `titles` tab,
+details on that film will become available in the other tabs.
+
+---------------------
+
 ## What is in the database?
 
 First, let us check the available tables:

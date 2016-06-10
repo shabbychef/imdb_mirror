@@ -65,10 +65,10 @@ shinyServer(function(input, output) {
 
 			nameinfo <- tbl(con,'name') %>%
 				select(person_id,name,gender,dob) %>% 
-				filter(name %regexp% input$cast_grep) 
+				dplyr::filter(name %regexp% input$cast_grep) 
 
 			precasts <- tbl(con,'role_type') %>% 
-				filter(role %in% c('actor','actress')) %>%
+				dplyr::filter(role %in% c('actor','actress')) %>%
 				select(role_id) %>% 
 				left_join(tbl(con,'cast_info') %>% 
 								select(movie_id,person_id,role_id,nr_order),
@@ -82,7 +82,7 @@ shinyServer(function(input, output) {
 				select(-person_id) 
 
 			allt <- tbl(con,'title') %>% 
-				filter(production_year >= minpy, production_year <= maxpy) %>%
+				dplyr::filter(production_year >= minpy, production_year <= maxpy) %>%
 				select(movie_id,title,imdb_index,ttid,production_year) %>% 
 				collect() 
 
@@ -97,6 +97,7 @@ shinyServer(function(input, output) {
 													imdb_index=character(0),
 													gender=character(0),
 													title=character(0),
+													dob=character(0),
 													ttid=integer(0),
 													production_year=integer(0),
 													stringsAsFactors=FALSE)
@@ -124,10 +125,10 @@ shinyServer(function(input, output) {
 
 			nameinfo <- tbl(con,'name') %>%
 				select(person_id,name,gender) %>% 
-				filter(name %regexp% input$diro_grep) 
+				dplyr::filter(name %regexp% input$diro_grep) 
 
 			precasts <- tbl(con,'role_type') %>% 
-				filter(role == 'director') %>%
+				dplyr::filter(role == 'director') %>%
 				select(role_id) %>% 
 				left_join(tbl(con,'IMDb_cast_info') %>% 
 								select(movie_id,person_id,role_id),
@@ -141,7 +142,7 @@ shinyServer(function(input, output) {
 				select(-person_id) 
 
 			allt <- tbl(con,'title') %>% 
-				filter(production_year >= minpy, production_year <= maxpy) %>%
+				dplyr::filter(production_year >= minpy, production_year <= maxpy) %>%
 				select(movie_id,title,imdb_index,ttid,production_year) %>% 
 				collect() 
 
@@ -171,13 +172,13 @@ shinyServer(function(input, output) {
 			maxpy <- max(pyear)
 
 			allt <- tbl(con,'title') %>% 
-				filter(production_year >= minpy, production_year <= maxpy) %>%
-				filter(title %regexp% input$title_grep) %>%
+				dplyr::filter(production_year >= minpy, production_year <= maxpy) %>%
+				dplyr::filter(title %regexp% input$title_grep) %>%
 				select(movie_id,title,imdb_index,ttid,production_year) %>% 
 				collect() 
 
 			trut <- allt %>% 
-				filter(grepl(input$title_grep,title,ignore.case=TRUE)) %>%
+				dplyr::filter(grepl(input$title_grep,title,ignore.case=TRUE)) %>%
 				mutate(primary_title=TRUE)
 
 			if (input$primary_title_only) {
@@ -185,7 +186,7 @@ shinyServer(function(input, output) {
 			} else {
 				akat <- tbl(con,'aka_title') %>%
 					select(movie_id,title) %>%
-					filter(title %regexp% input$title_grep) %>%
+					dplyr::filter(title %regexp% input$title_grep) %>%
 					collect() %>%
 					mutate(primary_title=FALSE) %>%
 					left_join(allt %>% select(-title),by='movie_id')
@@ -234,15 +235,15 @@ shinyServer(function(input, output) {
 			subt <- subt %>% mutate(budget=NA)
 		} else {
 			mbud <- tbl(con,'movie_budgets') %>% 
-				filter(units=='$') %>% 
+				dplyr::filter(units=='$') %>% 
 				select(movie_id,amount) %>%
 				rename(budget=amount)
 			if (length(ok_mid) == 1) {
 				mbud <- mbud %>%
-					filter(movie_id == ok_mid) 
+					dplyr::filter(movie_id == ok_mid) 
 			} else {
 				mbud <- mbud %>%
-					filter(movie_id %in% ok_mid)
+					dplyr::filter(movie_id %in% ok_mid)
 			}
 			subt <- subt %>% 
 				left_join(mbud %>% collect(),by='movie_id')
@@ -253,14 +254,14 @@ shinyServer(function(input, output) {
 		} else {
 			if (length(ok_mid) == 1) {
 				vpy <- tbl(con,'votes_per_year') %>% 
-					filter(movie_id == ok_mid) 
+					dplyr::filter(movie_id == ok_mid) 
 			} else {
 				vpy <- tbl(con,'votes_per_year') %>% 
-					filter(movie_id %in% ok_mid)
+					dplyr::filter(movie_id %in% ok_mid)
 			}
 
 			vpy <- vpy %>% 
-				filter((input$min_vpy <= 5) | (vpy >= input$min_vpy)) %>%
+				dplyr::filter((input$min_vpy <= 5) | (vpy >= input$min_vpy)) %>%
 				collect() %>%
 				rename(votes_peryr=vpy) %>%
 				mutate(votes_peryr=signif(votes_peryr,2))
@@ -277,15 +278,15 @@ shinyServer(function(input, output) {
 			if (length(ok_mid) == 1) {
 				jointo <- tbl(con,'movie_info') %>% 
 									select(movie_id,info_type_id,info) %>%
-									filter(movie_id == ok_mid)
+									dplyr::filter(movie_id == ok_mid)
 			} else {
 				jointo <- tbl(con,'movie_info') %>% 
 									select(movie_id,info_type_id,info) %>%
-									filter(movie_id %in% ok_mid)
+									dplyr::filter(movie_id %in% ok_mid)
 			}
 
 			taglos <- tbl(con,'info_type') %>% 
-				filter(info=='taglines')  %>% 
+				dplyr::filter(info=='taglines')  %>% 
 				select(info_type_id) %>% 
 				left_join(jointo,by='info_type_id') %>%
 				select(movie_id,info) %>%
@@ -366,11 +367,11 @@ shinyServer(function(input, output) {
 		ok_id <- dspv$movie_id
 
 		synops <- tbl(con,'info_type') %>% 
-			filter(info=='plot')  %>% 
+			dplyr::filter(info=='plot')  %>% 
 			select(info_type_id) %>% 
 			left_join(tbl(con,'movie_info') %>% 
 							select(movie_id,info_type_id,info) %>%
-							filter(movie_id==ok_id),
+							dplyr::filter(movie_id==ok_id),
 							by='info_type_id') %>%
 			select(movie_id,info) %>%
 			collect() %>% 
@@ -398,11 +399,11 @@ shinyServer(function(input, output) {
 		ok_id <- dspv$movie_id
 
 		genres <- tbl(con,'info_type') %>% 
-			filter(info=='genres')  %>% 
+			dplyr::filter(info=='genres')  %>% 
 			select(info_type_id) %>% 
-			left_join(tbl(con,'IMDb_movie_info') %>% 
+			left_join(tbl(con,'movie_info') %>% 
 							select(movie_id,info_type_id,info) %>%
-							filter(movie_id==ok_id),
+							dplyr::filter(movie_id==ok_id),
 							by='info_type_id') %>%
 			select(movie_id,info) %>%
 			collect() %>% 
@@ -429,11 +430,11 @@ shinyServer(function(input, output) {
 		ok_id <- dspv$movie_id
 
 		casts <- tbl(con,'role_type') %>% 
-			filter(role %in% c('actor','actress')) %>%
+			dplyr::filter(role %in% c('actor','actress')) %>%
 			select(role_id) %>% 
 			left_join(tbl(con,'cast_info') %>% 
 							select(movie_id,person_id,role_id,nr_order) %>%
-							filter(movie_id==ok_id),
+							dplyr::filter(movie_id==ok_id),
 							by='role_id') %>%
 			select(movie_id,person_id,nr_order) %>%
 			left_join(tbl(con,'name') %>%
@@ -463,11 +464,11 @@ shinyServer(function(input, output) {
 		ok_id <- dspv$movie_id
 
 		diros <- tbl(con,'role_type') %>% 
-			filter(role=='director') %>%
+			dplyr::filter(role=='director') %>%
 			select(role_id) %>% 
 			left_join(tbl(con,'cast_info') %>% 
 							select(movie_id,person_id,role_id,nr_order) %>%
-							filter(movie_id==ok_id),
+							dplyr::filter(movie_id==ok_id),
 							by='role_id') %>%
 			select(movie_id,person_id,nr_order) %>%
 			left_join(tbl(con,'name') %>%
@@ -497,7 +498,7 @@ shinyServer(function(input, output) {
 		ok_id <- dspv$movie_id
 
 		keyos <- tbl(con,'movie_keyword') %>%
-			filter(movie_id==ok_id) %>%
+			dplyr::filter(movie_id==ok_id) %>%
 			select(movie_id,keyword_id) %>%
 			left_join(tbl(con,'keyword') %>% 
 								select(keyword_id,keyword),
@@ -525,7 +526,7 @@ shinyServer(function(input, output) {
 		ok_id <- dspv$movie_id
 
 		bogro <- tbl(con,'movie_gross') %>%
-			filter(movie_id==ok_id) %>%
+			dplyr::filter(movie_id==ok_id) %>%
 			select(movie_id,units,locale,amount,end_date) %>%
 			collect() %>%
 			left_join(dspv %>% select(title,movie_id),by='movie_id') %>%
@@ -562,7 +563,7 @@ shinyServer(function(input, output) {
 		ok_id <- dspv$movie_id
 
 		keyos <- tbl(con,'movie_weekend_gross') %>%
-			filter(movie_id==ok_id) %>%
+			dplyr::filter(movie_id==ok_id) %>%
 			select(movie_id,units,locale,screens,days_open,amount,end_date) %>%
 			collect() %>%
 			left_join(dspv %>% select(title,movie_id),by='movie_id') %>%
@@ -594,7 +595,7 @@ shinyServer(function(input, output) {
 		ok_id <- dspv$movie_id
 
 		keyos <- tbl(con,'movie_weekend_gross') %>%
-			filter(movie_id==ok_id) %>%
+			dplyr::filter(movie_id==ok_id) %>%
 			select(movie_id,units,locale,screens,days_open,amount,end_date) %>%
 			collect() %>%
 			left_join(dspv %>% select(title,movie_id),by='movie_id') %>%
@@ -604,7 +605,7 @@ shinyServer(function(input, output) {
 			select(title,locale,amount,units,screens,days_open,end_date) 
 
 		showus <- keyos %>% 
-			filter(units=='$') 
+			dplyr::filter(units=='$') 
 
 			#geom_path(arrow=arrow(length=unit(0.20,'inches'),type='closed')) +
 		#http://stackoverflow.com/a/3421563/164611
@@ -630,7 +631,7 @@ shinyServer(function(input, output) {
 		ok_id <- dspv$movie_id
 
 		votos <- tbl(con,'movie_votes') %>%
-			filter(movie_id==ok_id) %>%
+			dplyr::filter(movie_id==ok_id) %>%
 			select(-id,-updated_at) %>%
 			collect() %>%
 			left_join(dspv %>% select(title,movie_id),by='movie_id') %>%
@@ -659,11 +660,11 @@ shinyServer(function(input, output) {
 		ok_id <- dspv$movie_id
 
 		quotos <- tbl(con,'info_type') %>% 
-			filter(info=='quotes')  %>% 
+			dplyr::filter(info=='quotes')  %>% 
 			select(info_type_id) %>% 
-			left_join(tbl(con,'IMDb_movie_info') %>% 
+			left_join(tbl(con,'movie_info') %>% 
 							select(movie_id,info_type_id,info) %>%
-							filter(movie_id==ok_id),
+							dplyr::filter(movie_id==ok_id),
 							by='info_type_id') %>%
 			select(movie_id,info) %>%
 			collect() %>% 
