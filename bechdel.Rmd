@@ -104,7 +104,8 @@ max_order <- raw_in %>%
 is_in <- raw_in %>%
 	inner_join(max_order,by=c('movie_id','role')) %>%
 	mutate(nr_order=as.numeric(pmin(nr_order,max_ord))) %>%
-	mutate(weight=2^(-nr_order/ORDER_DOWNWEIGHTING)) 
+	mutate(weight=2^(-nr_order/ORDER_DOWNWEIGHTING)) %>%
+	select(-nr_order)
 	#mutate(nr_order=coalesce(nr_order,max_ord)) %>%
 # get person data
 person_data <- tbl(dbcon,'name') %>%
@@ -122,7 +123,7 @@ merge_in <- is_in %>%
 	mutate(age=max(0,min(100,production_year - yob))) %>%
 	select(-person_id,-production_year,-yob) %>%
 	group_by(role,movie_id) %>%
-	mutate(count=n(),
+	summarize(count=n(),
 		sum_male=sum(ismale),wsum_male=sum(ismale * weight),
 		sum_age=sum(age),wsum_age=sum(age * weight),
 		wsum=sum(weight)) %>%
