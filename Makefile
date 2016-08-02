@@ -14,7 +14,7 @@ PKG_LCNAME 				:= $(shell echo $(PKG_NAME) | tr 'A-Z' 'a-z')
 
 ############## TARGETS ##############
 
-MD_TARGETS 			 = README.md seasonality.md
+MD_TARGETS 			 = README.md seasonality.md bechdel.md
 HTML_TARGETS 		 = $(patsubst %.md,%.html,$(MD_TARGETS))
 
 ############## DEFAULT ##############

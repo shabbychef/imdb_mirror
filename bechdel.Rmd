@@ -1,0 +1,167 @@
+```{r setup,include=FALSE}
+# set the knitr options ... for everyone!
+# if you unset this, then vignette build bonks. oh, joy.
+#opts_knit$set(progress=TRUE)
+opts_knit$set(eval.after='fig.cap')
+# for a package vignette, you do want to echo.
+# opts_chunk$set(echo=FALSE,warning=FALSE,message=FALSE)
+opts_chunk$set(warning=FALSE,message=FALSE)
+#opts_chunk$set(results="asis")
+opts_chunk$set(cache=FALSE,cache.path="cache/")
+
+opts_chunk$set(fig.path="figure/bechdel_",dev=c("png"))
+opts_chunk$set(fig.width=9,fig.height=6,dpi=100,out.width='900px',out.height='600px')
+
+# doing this means that png files are made of figures;
+# the savings is small, and it looks like shit:
+#opts_chunk$set(fig.path="figure/",dev=c("png","pdf","cairo_ps"))
+#opts_chunk$set(fig.width=4,fig.height=4)
+# for figures? this is sweave-specific?
+#opts_knit$set(eps=TRUE)
+
+# this would be for figures:
+#opts_chunk$set(out.width='.8\\textwidth')
+# for text wrapping:
+options(width=96,digits=2)
+opts_chunk$set(size="small")
+opts_chunk$set(tidy=TRUE,tidy.opts=list(width.cutoff=50,keep.blank.line=TRUE))
+library(ggplot2)
+```
+
+# Bechdel test data
+
+Here I use `dplyr` to gather data on films and gender from the IMDb mirror.
+I drop movies within the `Documentary` genre, and only include those
+which list English as one language.
+
+```{r bechdel_setup,eval=TRUE,tidy=FALSE}
+library(RMySQL)
+library(dplyr)
+library(knitr)
+dbcon <- src_mysql(host='0.0.0.0',user='moe',password='movies4me',dbname='IMDB',port=23306)
+capt <- dbGetQuery(dbcon$con,'SET NAMES utf8')
+
+# genre information
+movie_genres <- tbl(dbcon,'movie_info') %>%
+	inner_join(tbl(dbcon,'info_type') %>% 
+		filter(info %regexp% 'genres') %>%
+		select(info_type_id),
+		by='info_type_id') 
+# get documentary movies;
+doccos <- movie_genres %>% 
+		filter(info %regexp% 'Documentary') %>%
+		select(movie_id)
+# language information
+movie_languages <- tbl(dbcon,'movie_info') %>%
+	inner_join(tbl(dbcon,'info_type') %>% 
+		filter(info %regexp% 'languages') %>%
+		select(info_type_id),
+		by='info_type_id') 
+# get movies with English
+unnerstandit <- movie_languages %>% 
+		filter(info %regexp% 'English') %>%
+		select(movie_id)
+# movies which are not documentaries, have some English, filtered by production year
+movies <- tbl(dbcon,'title') %>%
+	select(-imdb_index,-ttid,-md5sum) %>%
+	anti_join(doccos %>% distinct(movie_id),by='movie_id') %>%
+	inner_join(unnerstandit %>% distinct(movie_id),by='movie_id') %>%
+	filter(production_year >= 1965,production_year <= 2015) %>%
+	compute()
+```
+
+Now I load information about people, selecting relationships where the person
+is an actor or actress, director, writer, or producer of a film. I join the
+gender and age information to the 'is in' relationship, and take sums
+and weighted means, where the weighted means use a downweighting depending
+on the `nr_order`.
+
+```{r bechdel_isin,eval=TRUE,tidy=FALSE}
+# change this to change downweighting.
+# 3 = person #1 is twice as important as person #4
+# 10 = person #1 is twice as important as person #11
+ORDER_DOWNWEIGHTING <- 3
+# acts/directs/writes/produces relation
+# convert 'actress' and 'actor' to 'acts in' so that
+# nr_order makes sense. 
+# mariadb = awesome, BTW
+raw_in <- tbl(dbcon,'cast_info') %>%
+	inner_join(tbl(dbcon,'role_type') %>% 
+		filter(role %regexp% 'actor|actress|producer|writer|director'),
+		by='role_id') %>%
+	select(person_id,movie_id,nr_order,role) %>%
+	inner_join(movies %>% select(movie_id),by='movie_id') %>%
+	mutate(role=regexp_replace(role,'actor|actress','actsin')) %>%
+	compute()
+# then coalesce nr_order to the maximal value.
+max_order <- raw_in %>%
+	group_by(movie_id,role) %>% 
+	summarize(max_ord=max(coalesce(nr_order,0))) %>%
+	ungroup() %>%
+	compute()
+# then coalesce nr_order to the maximal value.
+is_in <- raw_in %>%
+	inner_join(max_order,by=c('movie_id','role')) %>%
+	mutate(nr_order=coalesce(nr_order,max_ord)) %>%
+	mutate(weight=2^(-nr_order/ORDER_DOWNWEIGHTING)) %>%
+	compute()
+# get person data
+person_data <- tbl(dbcon,'name') %>%
+	select(person_id,name,gender,dob) %>%
+	filter(!is.na(dob)) %>%
+	filter(gender %regexp% 'm|f') %>%
+  mutate(yob=year(dob)) %>%
+	mutate(ismale=(gender=='m')) %>%
+	filter(yob >= 1875) %>%
+	compute()
+# merge person data and is-in data
+merge_in <- is_in %>% 
+	inner_join(person_data %>% select(person_id,yob,ismale),by='person_id') %>%
+	inner_join(movies %>% select(movie_id,production_year),by='movie_id') %>%
+	mutate(age=greatest(0,least(100,production_year - yob))) %>%
+	collect(n=Inf) %>%
+	group_by(role,movie_id) %>%
+	mutate(count=n(),
+		sum_male=sum(ismale),wsum_male=sum(ismale * weight),
+		sum_age=sum(age),wsum_age=sum(age * weight),
+		wsum=sum(weight)) %>%
+	ungroup() %>%
+	mutate(mean_male=sum_male / count,
+		wmean_male=wsum_male / wsum,
+		mean_age=sum_age / count,
+		wmean_age=wsum_age / wsum,
+		sum_female=count-sum_male) 
+```
+
+Now I get information about films: IMDb ratings (votes), and domestic gross box office.
+
+```{r bechdel_film_data,eval=TRUE,tidy=FALSE}
+# votes for all movies, filtered by having enough votes
+vote_info <- tbl(dbcon,'movie_votes') %>% 
+	select(movie_id,votes,vote_mean,vote_sd,vote_se) %>%
+	filter(votes >= 20) %>%
+	inner_join(movies %>% select(movie_id),by='movie_id') %>%
+	compute()
+# US gross box office, in dollars. this is a view in the db
+gross <- tbl(dbcon,'movie_US_gross') %>% 
+	inner_join(movies %>% select(movie_id),by='movie_id') %>%
+	compute()
+```
+
+Now put them all together:
+```{r bechdel_joinem,eval=TRUE,tidy=FALSE}
+movie_data <- movies %>%
+	inner_join(vote_info,by='movie_id') %>%
+	inner_join(gross,by='movie_id') %>%
+	collect(n=Inf) %>%
+	inner_join(merge_in,by='movie_id') 
+```
+
+Now take a look:
+
+```{r bechdel_show,eval=TRUE,tidy=FALSE}
+movie_data %>% heaad(n=20) %>% kable()
+# write it so you all can have it.
+library(readr)
+readr::write_csv(movie_data,path='bechdel_data.csv')
+```
