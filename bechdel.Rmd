@@ -120,7 +120,7 @@ merge_in <- is_in %>%
 	inner_join(person_data %>% select(person_id,yob,ismale),by='person_id') %>%
 	inner_join(movies %>% distinct(movie_id,production_year),by='movie_id') %>%
 	mutate(age=max(0,min(100,production_year - yob))) %>%
-	select(-production_year,-yob) %>%
+	select(-person_id,-production_year,-yob) %>%
 	group_by(role,movie_id) %>%
 	mutate(count=n(),
 		sum_male=sum(ismale),wsum_male=sum(ismale * weight),
