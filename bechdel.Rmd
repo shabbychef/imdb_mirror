@@ -67,7 +67,7 @@ movies <- tbl(dbcon,'title') %>%
 	anti_join(doccos %>% distinct(movie_id),by='movie_id') %>%
 	inner_join(unnerstandit %>% distinct(movie_id),by='movie_id') %>%
 	filter(production_year >= 1965,production_year <= 2015) %>%
-	compute()
+	collect()
 ```
 
 Now I load information about people, selecting relationships where the person
@@ -80,7 +80,7 @@ on the `nr_order`.
 # change this to change downweighting.
 # 3 = person #1 is twice as important as person #4
 # 10 = person #1 is twice as important as person #11
-ORDER_DOWNWEIGHTING <- 3
+ORDER_DOWNWEIGHTING <- 3.0
 # acts/directs/writes/produces relation
 # convert 'actress' and 'actor' to 'acts in' so that
 # nr_order makes sense. 
@@ -90,21 +90,22 @@ raw_in <- tbl(dbcon,'cast_info') %>%
 		filter(role %regexp% 'actor|actress|producer|writer|director'),
 		by='role_id') %>%
 	select(person_id,movie_id,nr_order,role) %>%
-	inner_join(movies %>% select(movie_id),by='movie_id') %>%
-	mutate(role=regexp_replace(role,'actor|actress','actsin')) %>%
-	compute()
+	collect() %>%
+	inner_join(movies %>% distinct(movie_id),by='movie_id') %>%
+	mutate(role=as.factor(gsub('actor|actress','actsin',role)))
+	#mutate(role=regexp_replace(role,'actor|actress','actsin')) 
 # then coalesce nr_order to the maximal value.
 max_order <- raw_in %>%
 	group_by(movie_id,role) %>% 
-	summarize(max_ord=max(coalesce(nr_order,0))) %>%
-	ungroup() %>%
-	compute()
+	summarize(max_ord=max(pmax(0,nr_order),na.rm=TRUE)) %>%
+	ungroup() 
+	#summarize(max_ord=max(coalesce(nr_order,0))) %>%
 # then coalesce nr_order to the maximal value.
 is_in <- raw_in %>%
 	inner_join(max_order,by=c('movie_id','role')) %>%
-	mutate(nr_order=coalesce(nr_order,max_ord)) %>%
-	mutate(weight=2^(-nr_order/ORDER_DOWNWEIGHTING)) %>%
-	compute()
+	mutate(nr_order=as.numeric(pmin(nr_order,max_ord))) %>%
+	mutate(weight=2^(-nr_order/ORDER_DOWNWEIGHTING)) 
+	#mutate(nr_order=coalesce(nr_order,max_ord)) %>%
 # get person data
 person_data <- tbl(dbcon,'name') %>%
 	select(person_id,name,gender,dob) %>%
@@ -113,13 +114,12 @@ person_data <- tbl(dbcon,'name') %>%
   mutate(yob=year(dob)) %>%
 	mutate(ismale=(gender=='m')) %>%
 	filter(yob >= 1875) %>%
-	compute()
+	collect()
 # merge person data and is-in data
 merge_in <- is_in %>% 
 	inner_join(person_data %>% select(person_id,yob,ismale),by='person_id') %>%
-	inner_join(movies %>% select(movie_id,production_year),by='movie_id') %>%
-	mutate(age=greatest(0,least(100,production_year - yob))) %>%
-	collect(n=Inf) %>%
+	inner_join(movies %>% distinct(movie_id,production_year),by='movie_id') %>%
+	mutate(age=max(0,min(100,production_year - yob))) %>%
 	group_by(role,movie_id) %>%
 	mutate(count=n(),
 		sum_male=sum(ismale),wsum_male=sum(ismale * weight),
@@ -140,12 +140,12 @@ Now I get information about films: IMDb ratings (votes), and domestic gross box 
 vote_info <- tbl(dbcon,'movie_votes') %>% 
 	select(movie_id,votes,vote_mean,vote_sd,vote_se) %>%
 	filter(votes >= 20) %>%
-	inner_join(movies %>% select(movie_id),by='movie_id') %>%
-	compute()
+	collect() %>%
+	inner_join(movies %>% distinct(movie_id),by='movie_id') 
 # US gross box office, in dollars. this is a view in the db
 gross <- tbl(dbcon,'movie_US_gross') %>% 
-	inner_join(movies %>% select(movie_id),by='movie_id') %>%
-	compute()
+	collect() %>%
+	inner_join(movies %>% distinct(movie_id),by='movie_id') 
 ```
 
 Now put them all together:
@@ -153,15 +153,16 @@ Now put them all together:
 movie_data <- movies %>%
 	inner_join(vote_info,by='movie_id') %>%
 	inner_join(gross,by='movie_id') %>%
-	collect(n=Inf) %>%
 	inner_join(merge_in,by='movie_id') 
 ```
 
 Now take a look:
 
 ```{r bechdel_show,eval=TRUE,tidy=FALSE}
-movie_data %>% heaad(n=20) %>% kable()
+movie_data %>% head(n=20) %>% kable()
 # write it so you all can have it.
 library(readr)
 readr::write_csv(movie_data,path='bechdel_data.csv')
 ```
+
+have to tidy them.
