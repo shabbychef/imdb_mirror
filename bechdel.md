@@ -126,12 +126,8 @@ vote_info <- tbl(dbcon,'movie_votes') %>%
 gross <- tbl(dbcon,'movie_US_gross') %>% 
 	collect(n=Inf) %>%
 	rename(theat_gross_dollars=gross_dollars) %>%
-	rename(last_report_date=theat_last_date) %>%
+	rename(theat_last_date=last_report_date) %>%
 	inner_join(movies %>% distinct(movie_id),by='movie_id') 
-```
-
-```
-## Error: Unknown variables: theat_last_date.
 ```
 
 Now put them all together:
@@ -143,10 +139,6 @@ movie_data <- movies %>%
 	inner_join(merge_in,by='movie_id') 
 ```
 
-```
-## Error in is.data.frame(y): object 'gross' not found
-```
-
 Now take a look:
 
 
@@ -154,9 +146,30 @@ Now take a look:
 movie_data %>% head(n=20) %>% kable()
 ```
 
-```
-## Error in eval(expr, envir, enclos): object 'movie_data' not found
-```
+
+
+| movie_id|title                 | production_year| votes| vote_mean| vote_sd| theat_gross_dollars|theat_last_date |role     | count| count_male| mean_male| wmean_male| mean_age| wmean_age| count_female|status     |
+|--------:|:---------------------|---------------:|-----:|---------:|-------:|-------------------:|:---------------|:--------|-----:|----------:|---------:|----------:|--------:|---------:|------------:|:----------|
+|      313|$9.99                 |            2008|  2634|       6.2|     2.3|             5.2e+04|2010-01-17      |actsin   |    11|          9|      0.82|       0.86|       46|        49|            2|mixed      |
+|      313|$9.99                 |            2008|  2634|       6.2|     2.3|             5.2e+04|2010-01-17      |writer   |     2|          2|      1.00|       1.00|       41|        41|            0|all male   |
+|      323|$pent                 |            2000|   107|       4.7|     2.5|             9.3e+03|2016-08-02      |actsin   |    16|         11|      0.69|       0.65|       40|        35|            5|mixed      |
+|      323|$pent                 |            2000|   107|       4.7|     2.5|             9.3e+03|2016-08-02      |director |     1|          1|      1.00|       1.00|       31|        31|            0|all male   |
+|      323|$pent                 |            2000|   107|       4.7|     2.5|             9.3e+03|2016-08-02      |writer   |     1|          1|      1.00|       1.00|       31|        31|            0|all male   |
+|      362|'71                   |            2014| 33341|       6.4|     2.2|             1.3e+06|2015-05-03      |actsin   |    13|         11|      0.85|       0.99|       36|        28|            2|mixed      |
+|      362|'71                   |            2014| 33341|       6.4|     2.2|             1.3e+06|2015-05-03      |director |     1|          1|      1.00|       1.00|       37|        37|            0|all male   |
+|      412|'Breaker' Morant      |            1980| 10096|       7.1|     2.5|             7.1e+06|2016-08-02      |actsin   |    13|         13|      1.00|       1.00|       41|        42|            0|all male   |
+|      412|'Breaker' Morant      |            1980| 10096|       7.1|     2.5|             7.1e+06|2016-08-02      |director |     1|          1|      1.00|       1.00|       40|        40|            0|all male   |
+|      412|'Breaker' Morant      |            1980| 10096|       7.1|     2.5|             7.1e+06|2016-08-02      |writer   |     4|          4|      1.00|       1.00|       43|        40|            0|all male   |
+|      447|'Crocodile' Dundee II |            1988| 43489|       5.5|     2.1|             1.1e+08|2016-08-02      |actsin   |    29|         24|      0.83|       0.76|       38|        42|            5|mixed      |
+|      447|'Crocodile' Dundee II |            1988| 43489|       5.5|     2.1|             1.1e+08|2016-08-02      |director |     1|          1|      1.00|       1.00|       47|        47|            0|all male   |
+|      447|'Crocodile' Dundee II |            1988| 43489|       5.5|     2.1|             1.1e+08|2016-08-02      |writer   |     2|          2|      1.00|       1.00|       49|        49|            0|all male   |
+|      623|'night, Mother        |            1986|  1682|       7.2|     2.6|             4.4e+05|2016-08-02      |actsin   |     5|          1|      0.20|       0.12|       43|        43|            4|mixed      |
+|      623|'night, Mother        |            1986|  1682|       7.2|     2.6|             4.4e+05|2016-08-02      |writer   |     2|          0|      0.00|       0.00|       39|        39|            2|all female |
+|      665|'R Xmas               |            2001|  1021|       5.7|     2.2|             8.5e+02|2016-08-02      |actsin   |    14|          9|      0.64|       0.63|       35|        36|            5|mixed      |
+|      665|'R Xmas               |            2001|  1021|       5.7|     2.2|             8.5e+02|2016-08-02      |director |     1|          1|      1.00|       1.00|       50|        50|            0|all male   |
+|      665|'R Xmas               |            2001|  1021|       5.7|     2.2|             8.5e+02|2016-08-02      |writer   |     1|          1|      1.00|       1.00|       50|        50|            0|all male   |
+|      678|'Round Midnight       |            1986|  3720|       6.9|     2.4|             3.3e+06|2016-08-02      |actsin   |    32|         27|      0.84|       0.67|       45|        45|            5|mixed      |
+|      678|'Round Midnight       |            1986|  3720|       6.9|     2.4|             3.3e+06|2016-08-02      |director |     1|          1|      1.00|       1.00|       45|        45|            0|all male   |
 
 ## Bechdel test data
 
@@ -194,28 +207,12 @@ twoway_key <- movie_data %>%
 	distinct(movie_id,.keep_all=TRUE) %>%
 	arrange(desc(titled)) %>%
 	select(movie_id,bechdel_id)
-```
 
-```
-## Error in eval(expr, envir, enclos): object 'movie_data' not found
-```
-
-```r
 joined_data <- movie_data %>% inner_join(twoway_key,by='movie_id') %>%
 	inner_join(upstream %>% rename(bechdel_title=title,bechdel_test=rating),by='bechdel_id')
-```
 
-```
-## Error in eval(expr, envir, enclos): object 'movie_data' not found
-```
-
-```r
 # write it so you all can have it.
 library(readr)
 readr::write_csv(joined_data,path='bechdel_data.csv')
-```
-
-```
-## Error in is.data.frame(x): object 'joined_data' not found
 ```
 

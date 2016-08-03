@@ -152,7 +152,7 @@ vote_info <- tbl(dbcon,'movie_votes') %>%
 gross <- tbl(dbcon,'movie_US_gross') %>% 
 	collect(n=Inf) %>%
 	rename(theat_gross_dollars=gross_dollars) %>%
-	rename(last_report_date=theat_last_date) %>%
+	rename(theat_last_date=last_report_date) %>%
 	inner_join(movies %>% distinct(movie_id),by='movie_id') 
 ```
 
