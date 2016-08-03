@@ -97,15 +97,16 @@ raw_in <- tbl(dbcon,'cast_info') %>%
 # then coalesce nr_order to the maximal value.
 max_order <- raw_in %>%
 	group_by(movie_id,role) %>% 
-	summarize(max_ord=max(pmax(0,nr_order),na.rm=TRUE)) %>%
+	summarize(max_ord=pmin(1e4,max(coalesce(nr_order,0L),na.rm=TRUE))) %>%
 	ungroup() 
 	#summarize(max_ord=max(coalesce(nr_order,0))) %>%
 # then coalesce nr_order to the maximal value.
 is_in <- raw_in %>%
 	inner_join(max_order,by=c('movie_id','role')) %>%
-	mutate(nr_order=as.numeric(pmin(nr_order,max_ord))) %>%
+	mutate(nr_order=as.numeric(nr_order)) %>%
+	mutate(nr_order=coalesce(nr_order,max_ord)) %>%
 	mutate(weight=2^(-nr_order/ORDER_DOWNWEIGHTING)) %>%
-	select(-nr_order)
+	select(-nr_order,-max_ord)
 	#mutate(nr_order=coalesce(nr_order,max_ord)) %>%
 # get person data
 person_data <- tbl(dbcon,'name') %>%
@@ -120,19 +121,22 @@ person_data <- tbl(dbcon,'name') %>%
 merge_in <- is_in %>% 
 	inner_join(person_data %>% select(person_id,yob,ismale),by='person_id') %>%
 	inner_join(movies %>% distinct(movie_id,production_year),by='movie_id') %>%
-	mutate(age=max(0,min(100,production_year - yob))) %>%
+	mutate(age=pmax(0,pmin(100,production_year - yob))) %>%
 	select(-person_id,-production_year,-yob) %>%
 	group_by(role,movie_id) %>%
 	summarize(count=n(),
-		sum_male=sum(ismale),wsum_male=sum(ismale * weight),
+		count_male=sum(ismale),wsum_male=sum(ismale * weight),
 		sum_age=sum(age),wsum_age=sum(age * weight),
 		wsum=sum(weight)) %>%
 	ungroup() %>%
-	mutate(mean_male=sum_male / count,
+	mutate(mean_male=count_male / count,
 		wmean_male=wsum_male / wsum,
 		mean_age=sum_age / count,
 		wmean_age=wsum_age / wsum,
-		sum_female=count-sum_male) 
+		count_female=count-count_male) %>%
+	select(-wsum_male,-sum_age,-wsum_age,-wsum) %>%
+	mutate(status=as.factor(ifelse(count_female==0,'all male',ifelse(count_male==0,'all female','mixed'))))
+	
 ```
 
 Now I get information about films: IMDb ratings (votes), and domestic gross box office.
@@ -140,13 +144,15 @@ Now I get information about films: IMDb ratings (votes), and domestic gross box 
 ```{r bechdel_film_data,eval=TRUE,tidy=FALSE}
 # votes for all movies, filtered by having enough votes
 vote_info <- tbl(dbcon,'movie_votes') %>% 
-	select(movie_id,votes,vote_mean,vote_sd,vote_se) %>%
+	select(movie_id,votes,vote_mean,vote_sd) %>%
 	filter(votes >= 20) %>%
 	collect(n=Inf) %>%
 	inner_join(movies %>% distinct(movie_id),by='movie_id') 
 # US gross box office, in dollars. this is a view in the db
 gross <- tbl(dbcon,'movie_US_gross') %>% 
 	collect(n=Inf) %>%
+	rename(theat_gross_dollars=gross_dollars) %>%
+	rename(last_report_date=theat_last_date) %>%
 	inner_join(movies %>% distinct(movie_id),by='movie_id') 
 ```
 
@@ -156,15 +162,55 @@ movie_data <- movies %>%
 	inner_join(vote_info,by='movie_id') %>%
 	inner_join(gross,by='movie_id') %>%
 	inner_join(merge_in,by='movie_id') 
+
 ```
 
 Now take a look:
 
 ```{r bechdel_show,eval=TRUE,tidy=FALSE}
 movie_data %>% head(n=20) %>% kable()
-# write it so you all can have it.
-library(readr)
-readr::write_csv(movie_data,path='bechdel_data.csv')
 ```
 
-have to tidy them.
+## Bechdel test data
+
+You can get this via their [API](http://bechdeltest.com/api/v1/doc#getMoviesByTitle). Get
+rid of awful JSON with (awful) `jq`:
+
+```{r bechdel_get,engine='bash',comment='bash',cache=TRUE,eval=FALSE}
+curl -o bechdel.json "http://bechdeltest.com/api/v1/getMoviesByTitle"
+echo -e "id\timdbid\tyear\ttitle\trating" > bechdel.tsv
+jq15 -r -s '.[] | .[] | [.id, .imdbid, .year, .title, .rating] | @tsv' bechdel.json >> bechdel.tsv
+```
+
+Join them together and save:
+
+```{r bechdel_join,eval=TRUE,tidy=FALSE}
+upstream <- readr::read_tsv('bechdel.tsv')
+# fix json problems
+upstream <- upstream %>%
+	rename(bechdel_id=id) %>%
+	mutate(title=gsub('&amp;','&',title)) %>%
+	mutate(title=gsub('&#39;',"'",title))
+
+# string matching. fun!
+library(stringdist)
+twoway_key <- movie_data %>% 
+	select(movie_id,title,production_year) %>%
+	distinct(movie_id,.keep_all=TRUE) %>%
+	mutate(ttl=phonetic(title)) %>%
+	inner_join(upstream %>% mutate(ttl=phonetic(title)),by=c('ttl'='ttl','production_year'='year')) %>%
+	mutate(titled=stringdist(title.x,title.y,method='jw')) %>%
+	filter(titled < 0.1) %>%
+	arrange(titled) %>%
+	distinct(movie_id,.keep_all=TRUE) %>%
+	arrange(desc(titled)) %>%
+	select(movie_id,bechdel_id)
+
+joined_data <- movie_data %>% inner_join(twoway_key,by='movie_id') %>%
+	inner_join(upstream %>% rename(bechdel_title=title,bechdel_test=rating),by='bechdel_id')
+
+# write it so you all can have it.
+library(readr)
+readr::write_csv(joined_data,path='bechdel_data.csv')
+```
+
