@@ -25,3 +25,6 @@
 bind-address	= 0.0.0.0
 
 # secure-file-priv = /srv/rw
+
+# avoids a problem where your password dies in 360 days with no warning...
+default_password_lifetime=0
