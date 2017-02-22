@@ -27,4 +27,6 @@ bind-address	= 0.0.0.0
 # secure-file-priv = /srv/rw
 
 # avoids a problem where your password dies in 360 days with no warning...
-default_password_lifetime=0
+# except this is only a problem in mysql, not mariadb.
+# see: https://jira.mariadb.org/browse/MDEV-10959
+#default_password_lifetime=0

@@ -1,10 +1,5 @@
 
 
-** WARNING **  something is currently broken with the docker setup, likely
-caused by changes in the `mariadb` container...
-
-
-
 # IMDb Mirror
 
 This is a 'mirror' of the IMDb database, stored in a mariadb
