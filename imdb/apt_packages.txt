@@ -2,7 +2,9 @@ make
 wget 
 rsync 
 perl 
-libmysqlclient-dev 
+libmariadbclient-dev 
+libmariadb-client-lgpl-dev
+binutils
 mysql-client
 libsqlite3-0
 python-imdbpy 
