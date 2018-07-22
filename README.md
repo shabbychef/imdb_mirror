@@ -1,13 +1,18 @@
 
+# IMDb Mirror (defunct)
 
-# IMDb Mirror
-
-This is a 'mirror' of the IMDb database, stored in a mariadb
+This _was_ a 'mirror' of the IMDb database, stored in a mariadb
 database. The data are downloaded from one of the IMDb FTP
 mirrors, then processed to remove TV shows, porn, shorts, 
 and 'insignificant' films (based on number of ratings).
 The database and scraper are housed in `docker` containers
 and orchestrated via `docker-compose` 
+
+I note that as of the end of December 2017, IMDB have shuttered their
+FTP site from which this project downloaded data. Since movies are no
+long my bread and butter, I will put this project into mothballs.
+
+----------------------------------
 
 ## Initialization
 
